@@ -1,0 +1,83 @@
+{
+  "code": 1,
+  "msg": "success",
+  "data": [
+    {
+      "hospitalId": "101",
+      "hospitalName": "佛山市第一人民医院",
+      "styleColor": "FF0032",
+      "tel": "0757-88888888",
+      "city": "佛山市"
+    },
+    {
+      "hospitalId": "101",
+      "hospitalName": "佛山市第一人民医院",
+      "styleColor": "FF0032",
+      "tel": "0757-88888888",
+      "city": "佛山市"
+    },
+    {
+      "hospitalId": "102",
+      "hospitalName": "佛山市第二人民医院",
+      "styleColor": "FF0032",
+      "tel": "0757-88888888",
+      "city": "佛山市"
+    },
+    {
+      "hospitalId": "103",
+      "hospitalName": "佛山市第三人民医院",
+      "styleColor": "FF0032",
+      "tel": "0757-88888888",
+      "city": "佛山市"
+    },
+    {
+      "hospitalId": "104",
+      "hospitalName": "佛山市第四人民医院",
+      "styleColor": "FF0032",
+      "tel": "0757-88888888",
+      "city": "佛山市"
+    },
+    {
+      "hospitalId": "105",
+      "hospitalName": "佛山市第五人民医院",
+      "styleColor": "FF0032",
+      "tel": "0757-88888888",
+      "city": "佛山市"
+    },
+    {
+      "hospitalId": "106",
+      "hospitalName": "佛山市第六人民医院",
+      "styleColor": "FF0032",
+      "tel": "0757-88888888",
+      "city": "佛山市"
+    },
+    {
+      "hospitalId": "107",
+      "hospitalName": "佛山市第七人民医院",
+      "styleColor": "FF0032",
+      "tel": "0757-88888888",
+      "city": "佛山市"
+    },
+    {
+      "hospitalId": "108",
+      "hospitalName": "佛山市第八人民医院",
+      "styleColor": "FF0032",
+      "tel": "0757-88888888",
+      "city": "佛山市"
+    },
+    {
+      "hospitalId": "109",
+      "hospitalName": "佛山市第九人民医院",
+      "styleColor": "FF0032",
+      "tel": "0757-88888888",
+      "city": "佛山市"
+    },
+    {
+      "hospitalId": "110",
+      "hospitalName": "东方医院",
+      "styleColor": "FF0032",
+      "tel": "0757-88888888",
+      "city": "北京"
+    }
+  ]
+}

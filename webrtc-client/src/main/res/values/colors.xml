@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <color name="white">#FFFFFF</color>
+    <!--背景颜色-->
+    <color name="grid_bg_network">#f9d7d6</color>
+    <color name="grid_bg_fragment">#f2f2f2</color>
+    <color name="grid_bg_toolbar_start">#1edfdb</color>
+    <color name="grid_bg_toolbar_end">#34bee0</color>
+    <!--字体颜色-->
+    <color name="grid_txt_network">#666666</color>
+    <color name="grid_txt_tab_selected">#24d5dc</color>
+    <color name="grid_txt_default">#333333</color>
+    <color name="grid_txt_personal_status">#999999</color>
+    <color name="grid_txt_dialog_right">#4391f5</color>
+
+    <!--分割线颜色-->
+    <color name="grid_div_tab_indicator">#29cede</color>
+    <color name="grid_div_item">#e5e5e5</color>
+</resources>

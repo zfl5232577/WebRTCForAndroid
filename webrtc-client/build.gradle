@@ -1,0 +1,96 @@
+apply plugin: 'com.android.library'
+
+
+android {
+    compileSdkVersion rootProject.ext.android.compileSdkVersion
+    // buildToolsVersion rootProject.ext.android.buildToolsVersion
+
+    sourceSets.main {
+        jniLibs.srcDir 'libs'
+        jni.srcDirs = [] //disable automatic ndk-build call
+    }
+
+    defaultConfig {
+        minSdkVersion rootProject.ext.android.minSdkVersion
+        targetSdkVersion rootProject.ext.android.targetSdkVersion
+        versionCode 3
+        versionName "0.0.3"
+
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    buildTypes {
+        def SIGNAL_URL = "SIGNAL_URL"
+        def STUN_URL = "STUN_URL"
+        def TURN_URL = "TURN_URL"
+        def TURN_ACCOUNT = "TURN_ACCOUNT"
+        def TURN_PASSWORD = "TURN_PASSWORD"
+        def UMENG_APPKEY = "UMENG_APPKEY"
+        def UMENG_SECRET = "UMENG_SECRET"
+        def XIAOMI_ID = "XIAOMI_ID"
+        def XIAOMI_KEY = "XIAOMI_KEY"
+        release {
+            buildConfigField "String", SIGNAL_URL, '"wss://222.243.3.150:8443/ws/signaling"'
+            buildConfigField "String", STUN_URL, '"stun:222.243.3.150:3478"'
+            buildConfigField "String", TURN_URL, '"turn:222.243.3.150:3478"'
+            buildConfigField "String", TURN_ACCOUNT, '"turn"'
+            buildConfigField "String", TURN_PASSWORD, '"05b4c082-5212-4df1-8721-476bab74754a"'
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+        debug {
+//            buildConfigField "String", SIGNAL_URL, '"wss://222.243.3.150:8443/ws/signaling"'
+//            buildConfigField "String", STUN_URL, '"stun:222.243.3.150:3478"'
+//            buildConfigField "String", TURN_URL, '"turn:222.243.3.150:3478"'
+//            buildConfigField "String", SIGNAL_URL, '"wss://192.168.64.253:8443/ws/signaling"'
+            buildConfigField "String", SIGNAL_URL, '"wss://10.16.2.88:8443/ws/signaling"'
+            buildConfigField "String", STUN_URL, '"stun:10.16.2.88:3478"'
+            buildConfigField "String", TURN_URL, '"turn:10.16.2.88:3478"'
+            buildConfigField "String", TURN_ACCOUNT, '"turn"'
+            buildConfigField "String", TURN_PASSWORD, '"05b4c082-5212-4df1-8721-476bab74754a"'
+            buildConfigField "String", UMENG_APPKEY, '"5ad462c3f43e485022000029"'
+            buildConfigField "String", UMENG_SECRET, '"cea9816851ca827dd4153f9f4fa775c7"'
+            buildConfigField "String", XIAOMI_ID, '"2882303761517770616"'
+            buildConfigField "String", XIAOMI_KEY, '"5371777025616"'
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    lintOptions {
+        abortOnError false
+    }
+}
+
+dependencies {
+    api files('libs/libjingle_peerconnection.jar')
+    implementation "com.android.support:appcompat-v7:$rootProject.ext.android.supportLibraryVersion"
+    implementation "com.android.support.constraint:constraint-layout:$rootProject.ext.android.constraintVersion"
+    implementation "cn.aorise:android-common:$rootProject.ext.thirdparty.aoriseCommonVersion"
+    implementation "io.reactivex.rxjava2:rxjava:2.1.3"
+    implementation "io.reactivex.rxjava2:rxandroid:2.0.1"
+    implementation "org.java-websocket:Java-WebSocket:1.3.5"
+    implementation "com.squareup.okhttp3:mockwebserver:3.9.1"
+    implementation "com.squareup.okhttp3:okhttp:3.9.1"
+    //PushSDK必须依赖基础组件库，所以需要加入对应依赖
+    implementation 'com.umeng.sdk:common:1.5.0'
+    //PushSDK必须依赖utdid库，所以需要加入对应依赖
+    implementation 'com.umeng.sdk:utdid:1.1.5.3'
+    //PushSDK
+    implementation 'com.umeng.sdk:push:4.1.0'
+    //小米Push通道
+    implementation 'com.umeng.sdk:push-xiaomi:1.0.0'
+    //华为Push通道
+    implementation 'com.umeng.sdk:push-huawei:1.0.0'
+    //魅族Push通道
+    implementation 'com.umeng.sdk:push-meizu:1.0.0'
+}
+
+/**
+ * 执行命令 gradle uploadArchives
+ */
+apply from: '../config/snapshot-common.gradle'

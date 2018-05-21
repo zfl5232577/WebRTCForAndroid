@@ -1,0 +1,141 @@
+apply plugin: 'com.android.application'
+
+// 版本发布名字
+def APP_NAME = 'aorise'
+// 版本发布时间
+def BUILD_TIME = new Date().format("yyyyMMdd", TimeZone.getTimeZone("UTC"))
+
+/**
+ * 1. gradle clean
+ * 2. gradle build / gradle assembleRelease
+ */
+android {
+    compileSdkVersion rootProject.ext.android.compileSdkVersion
+    // buildToolsVersion rootProject.ext.android.buildToolsVersion
+    dataBinding {
+        enabled = true
+    }
+    defaultConfig {
+        applicationId "cn.aorise.platform"
+        minSdkVersion rootProject.ext.android.minSdkVersion
+        targetSdkVersion rootProject.ext.android.targetSdkVersion
+        versionCode 1
+        versionName "1.0.0"
+        multiDexEnabled true
+
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+    }
+    signingConfigs {
+        release {
+            try {
+                keyAlias KEY_ALIAS
+                keyPassword KEY_PASSWORD
+                storeFile file('/keystore/aoriseReleaseSignature.jks')
+                storePassword STORE_PASSWORD
+                v2SigningEnabled false
+            } catch (ex) {
+                throw new InvalidUserDataException(ex.toString())
+            }
+        }
+        debug {
+            try {
+                keyAlias KEY_ALIAS
+                keyPassword KEY_PASSWORD
+                storeFile file('../keystore/aoriseSignature.jks')
+                storePassword STORE_PASSWORD
+                v2SigningEnabled false
+            } catch (ex) {
+                throw new InvalidUserDataException(ex.toString())
+            }
+        }
+    }
+    buildTypes {
+        def BASE_URL = "BASE_URL"
+        release {
+            buildConfigField "String", BASE_URL, '"https://api.douban.com/"'
+            minifyEnabled false
+            shrinkResources false
+            zipAlignEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // 视频项目第一个版本就是用的debug签名发布
+            signingConfig signingConfigs.debug
+        }
+        debug {
+            buildConfigField "String", BASE_URL, '"https://api.douban.com/"'
+            minifyEnabled false
+            shrinkResources false
+            zipAlignEnabled false
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    // Rename APP
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            if (buildType.name.equals('release')) {
+                outputFileName = "aorise-${variant.productFlavors[0].name}-v${variant.versionName}-${BUILD_TIME}-${buildType.name}.apk"
+            } else if (buildType.name.equals('debug')) {
+                outputFileName = "aorise-${variant.productFlavors[0].name}-${buildType.name}.apk"
+            }
+        }
+    }
+
+//    android.variantFilter { variant ->
+//        //减少build时间
+//        if (!variant.getFlavors().get(0).name.equals('grid')) {
+//            variant.setIgnore(true);
+//        }
+//    }
+
+    flavorDimensions 'aorise'
+
+    productFlavors {
+        grid {
+            dimension 'aorise'
+            applicationId 'cn.aorise.grid'
+            versionCode 1
+            versionName "1.0.1"
+            manifestPlaceholders = [PACKAGE_NAME_VALUE    : "cn.aorise.grid",
+                                    LOGIN_CLASS_NAME_VALUE: "cn.aorise.grid.ui.activity.MainActivity",
+                                    CHANNEL_VALUE         : "aorise",
+                                    UMENG_APPKEY_VALUE    : "59cc46f5f29d98102700001a"]
+        }
+    }
+
+    lintOptions {
+        abortOnError false
+    }
+
+    dexOptions {
+        dexInProcess true
+        preDexLibraries true
+        javaMaxHeapSize "4g"
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    packagingOptions {
+        exclude 'META-INF/rxjava.properties'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    // compile project(':commonLib')
+    androidTestImplementation "com.android.support.test.espresso:espresso-core:$rootProject.ext.android.espressoVersion"
+    testImplementation "junit:junit:$rootProject.ext.android.junitVersion"
+
+    gridApi project(':plugin:grid')
+
+    // 内存检查
+    debugImplementation "com.squareup.leakcanary:leakcanary-android:$rootProject.ext.thirdparty.leakcanaryVersion"
+    releaseImplementation "com.squareup.leakcanary:leakcanary-android-no-op:$rootProject.ext.thirdparty.leakcanaryVersion"
+
+    implementation 'com.android.support:multidex:1.0.2'
+}
+
+/**
+ * gradle sonarqube
+ */
+apply from: '../config/sonarqube.gradle'

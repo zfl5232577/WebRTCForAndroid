@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/layout_call"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="cn.aorise.webrtc.ui.DefaultCallActivity">
+
+    <cn.aorise.webrtc.webrtc.PercentFrameLayout
+        android:id="@+id/layout_remote_video"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <org.webrtc.SurfaceViewRenderer
+            android:id="@+id/surface_remote"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </cn.aorise.webrtc.webrtc.PercentFrameLayout>
+
+    <cn.aorise.webrtc.webrtc.PercentFrameLayout
+        android:id="@+id/layout_local_video"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <org.webrtc.SurfaceViewRenderer
+            android:id="@+id/surface_local"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </cn.aorise.webrtc.webrtc.PercentFrameLayout>
+
+    <TextView
+        android:id="@+id/tv_calling"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentTop="true"
+        android:layout_marginLeft="21dp"
+        android:layout_marginTop="27dp"
+        android:textColor="@color/white"
+        android:textSize="26sp" />
+
+    <LinearLayout
+        android:id="@+id/layout_user_info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="174dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
+
+        <ImageView
+            android:id="@+id/iv_avatar"
+            android:layout_width="84dp"
+            android:layout_height="84dp"
+            android:layout_marginBottom="23dp"
+            android:src="@drawable/grid_def_facetime_favicon" />
+
+        <TextView
+            android:id="@+id/tv_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="18dp"
+            android:text="张飞雨"
+            android:textColor="@color/white"
+            android:textSize="24sp" />
+
+        <TextView
+            android:id="@+id/tv_connect"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="向你发起视频"
+            android:textColor="@color/white"
+            android:textSize="16sp" />
+
+    </LinearLayout>
+
+    <RelativeLayout
+        android:id="@+id/layout_call_control"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="48dp">
+
+        <LinearLayout
+            android:id="@+id/layout_call_refuse"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentLeft="true"
+            android:layout_marginLeft="61dp"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:splitMotionEvents="false">
+
+            <ImageView
+                android:id="@+id/iv_refuse"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="14dp"
+                android:src="@drawable/grid_ic_reject" />
+
+            <TextView
+                android:id="@+id/tv_refuse"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="拒绝"
+                android:textColor="@color/white"
+                android:textSize="22sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/layout_call_invite"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerHorizontal="true"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/iv_invite"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="14dp"
+                android:src="@drawable/grid_ic_reject" />
+
+            <TextView
+                android:id="@+id/tv_invite"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="挂断"
+                android:textColor="@color/white"
+                android:textSize="22sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/layout_call_answer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentRight="true"
+            android:layout_marginRight="61dp"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:splitMotionEvents="false">
+
+            <ImageView
+                android:id="@+id/iv_answer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="14dp"
+                android:src="@drawable/grid_ic_answer" />
+
+            <TextView
+                android:id="@+id/tv_answer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/grid_call_answer"
+                android:textColor="@color/white"
+                android:textSize="22sp" />
+        </LinearLayout>
+    </RelativeLayout>
+</RelativeLayout>

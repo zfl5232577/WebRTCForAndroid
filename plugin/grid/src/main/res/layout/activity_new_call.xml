@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="ResourceName">
+
+    <RelativeLayout
+        android:id="@+id/layout_call"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        tools:context="cn.aorise.grid.ui.activity.CallActivity">
+
+        <cn.aorise.webrtc.webrtc.PercentFrameLayout
+            android:id="@+id/layout_remote_video"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <org.webrtc.SurfaceViewRenderer
+                android:id="@+id/surface_remote"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </cn.aorise.webrtc.webrtc.PercentFrameLayout>
+
+        <cn.aorise.webrtc.webrtc.PercentFrameLayout
+            android:id="@+id/layout_local_video"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <org.webrtc.SurfaceViewRenderer
+                android:id="@+id/surface_local"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </cn.aorise.webrtc.webrtc.PercentFrameLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:layout_centerInParent="true"
+            android:text="接听"
+            android:textColor="@color/white"
+            android:drawableTop="@drawable/grid_ic_answer"
+            android:drawablePadding="@dimen/aorise_size_10dp"
+            android:textSize="20sp"/>
+
+    </RelativeLayout>
+</layout>

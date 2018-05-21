@@ -1,0 +1,25 @@
+//// ext is a gradle closure allowing the declaration of global properties
+apply plugin: 'maven'
+
+//ext {
+//    PUBLISH_GROUP_ID = 'cn.aorise'
+//    PUBLISH_ARTIFACT_ID = 'common'
+//    PUBLISH_VERSION = android.defaultConfig.versionName
+//}
+
+uploadArchives {
+    repositories.mavenDeployer {
+//        def deployPath = file(getProperty('aar.deployPathCommon'))
+//        repository(url: "file://${deployPath.absolutePath}")
+        // def deployPath = file('D://maven-snapshots/')
+        def deployPath = file('../maven-snapshots')
+        println "${deployPath.absolutePath}"
+        repository(url: "file://${deployPath.absolutePath}")
+        pom.project {
+            groupId rootProject.ext.PUBLISH_GROUP_ID
+            artifactId rootProject.ext.PUBLISH_ARTIFACT_ID
+            version android.defaultConfig.versionName + '-SNAPSHOT'
+            // version android.defaultConfig.versionName
+        }
+    }
+}

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/grid_nav_header_height"
+        android:background="@drawable/grid_bg_information"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:theme="@style/ThemeOverlay.AppCompat.Dark">
+
+        <ImageView
+            android:id="@+id/iv_avatar"
+            android:layout_width="83dp"
+            android:layout_height="83dp"
+            android:layout_marginBottom="12dp"
+            android:layout_marginTop="43dp"
+            android:src="@drawable/grid_def_facetime_favicon" />
+
+        <TextView
+            android:id="@+id/tv_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="14dp"
+            android:textColor="@color/grid_txt_default"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/tv_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:drawableLeft="@drawable/grid_ic_online2_status"
+            android:drawablePadding="7dp"
+            android:textColor="@color/grid_txt_default"
+            android:textSize="12sp" />
+
+    </LinearLayout>
+</layout>

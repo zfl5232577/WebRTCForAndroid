@@ -1,0 +1,21 @@
+/**
+ * gradle sonarqube
+ */
+apply plugin: 'org.sonarqube'
+
+sonarqube {
+    properties {
+        property 'sonar.host.url', 'http://10.16.3.15:9000'
+        property 'sonar.login', 'admin'
+        property 'sonar.password', 'admin'
+        property 'sonar.projectKey', 'android-grid'
+        property 'sonar.projectName', 'android-grid'
+        property 'sonar.projectVersion', android.productFlavors.grid.versionName
+        property 'sonar.projectBaseDir', "${project.rootDir}"
+        property 'sonar.sources', "${project.rootDir}/plugin/grid/src/main/java"
+        property 'sonar.binaries', "${project.rootDir}/plugin/grid/build/intermediates/classes"
+        property 'sonar.sourceEncoding', 'UTF-8'
+        property 'sonar.language', 'java'
+        property 'sonar.profile', 'Android Lint'
+    }
+}

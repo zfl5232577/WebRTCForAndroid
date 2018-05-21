@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/grid_height_size64"
+    android:background="@color/white"
+    android:orientation="vertical">
+
+    <RelativeLayout
+        android:id="@+id/rv_person_information"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content">
+
+        <ImageView
+            android:id="@+id/iv_peron_favicon"
+            android:layout_width="@dimen/grid_width_size48"
+            android:layout_height="@dimen/grid_width_size48"
+            android:layout_alignParentLeft="true"
+            android:layout_centerVertical="true"
+            android:layout_marginLeft="@dimen/aorise_size_8dp"
+            android:src="@drawable/grid_def_favicon" />
+
+        <RelativeLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_marginLeft="@dimen/grid_margin_size12"
+            android:layout_toRightOf="@+id/iv_peron_favicon">
+
+
+            <TextView
+                android:id="@+id/tv_person_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/grid_tab_personal"
+                android:textColor="@color/grid_txt_default"
+                android:textSize="@dimen/grid_font_size15" />
+
+            <RelativeLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@+id/tv_person_name"
+                android:layout_marginTop="@dimen/aorise_size_10dp">
+
+                <ImageView
+                    android:id="@+id/iv_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_centerVertical="true"
+                    android:src="@drawable/grid_ic_online_status" />
+
+                <TextView
+                    android:id="@+id/tv_person_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_centerVertical="true"
+                    android:layout_marginLeft="@dimen/aorise_size_8dp"
+                    android:layout_toRightOf="@id/iv_status"
+                    android:text="@string/grid_person_status1"
+                    android:textColor="@color/grid_txt_personal_status"
+                    android:textSize="@dimen/aorise_font_size_micro" />
+
+
+            </RelativeLayout>
+        </RelativeLayout>
+
+        <LinearLayout
+            android:id="@+id/layout_call_facetime"
+            android:layout_width="@dimen/aorise_size_100dp"
+            android:layout_height="match_parent"
+            android:layout_alignParentRight="true"
+            android:gravity="center_vertical|right"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/iv_call_facetime"
+                android:layout_width="@dimen/grid_width_size17"
+                android:layout_height="@dimen/grid_height_size13"
+                android:layout_centerVertical="true"
+                android:layout_marginRight="@dimen/grid_margin_size12"
+                android:src="@drawable/grid_ic_call_normal" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/grid_div_height"
+            android:layout_alignParentBottom="true"
+            android:layout_marginLeft="@dimen/grid_margin_size12"
+            android:layout_toRightOf="@+id/iv_peron_favicon"
+            android:background="@color/grid_div_item" />
+
+    </RelativeLayout>
+</RelativeLayout>

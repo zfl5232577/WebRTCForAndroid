@@ -1,0 +1,23 @@
+// ext is a gradle closure allowing the declaration of global properties
+ext {
+    PUBLISH_ORG = 'aorise-android-group'
+    PUBLISH_GROUP_ID = 'cn.aorise'
+    PUBLISH_ARTIFACT_ID = 'android-webrtc'
+    //PUBLISH_VERSION = android.defaultConfig.versionName
+
+    android = [
+            compileSdkVersion    : 26,
+            // buildToolsVersion: '26.0.2',
+            minSdkVersion        : 16,
+            targetSdkVersion     : 26,
+            supportLibraryVersion: '26.0.2',
+            constraintVersion    : '1.0.2',
+            espressoVersion      : '3.0.1',
+            junitVersion         : '4.12',
+    ]
+
+    thirdparty = [
+            aoriseCommonVersion: '1.1.14-SNAPSHOT',
+            leakcanaryVersion  : '1.5.4',
+    ]
+}

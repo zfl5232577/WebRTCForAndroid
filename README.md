@@ -1,0 +1,2 @@
+# BaseChatForAndroid
+基于WebSocket和WebRTC的聊天系统

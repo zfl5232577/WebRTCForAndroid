@@ -24,7 +24,7 @@ import cn.aorise.webrtc.webrtc.RTCAudioManger;
  *     version: 1.0
  * </pre>
  */
-public class DefaultCallActivity extends BaseCallActivity implements View.OnClickListener {
+public class DefaultCallActivity extends NewBaseCallActivity implements View.OnClickListener {
 
     private TextView tvName;
     private TextView tvAnswer;
@@ -68,6 +68,7 @@ public class DefaultCallActivity extends BaseCallActivity implements View.OnClic
         layoutCallRefuse.setOnClickListener(this);
         layoutCallAnswer.setOnClickListener(this);
     }
+
     @Override
     protected SurfaceViewRenderer setSurfaceLocal() {
         return findViewById(R.id.surface_local);
@@ -110,15 +111,17 @@ public class DefaultCallActivity extends BaseCallActivity implements View.OnClic
                 tvCalling.setText("和" + name + "通话中");
                 tvAnswer.setText(R.string.grid_call_hands_free);
                 tvRefuse.setText(R.string.grid_call_hang_up);
-                switch (mRTCAudioManger.getCurrentMode()) {
-                    case RTCAudioManger.MODE_SPEAKER:
-                        ivAnswer.setImageResource(R.drawable.grid_ic_hands_free);
-                        break;
-                    case RTCAudioManger.MODE_EARPIECE:
-                        ivAnswer.setImageResource(R.drawable.grid_ic_speak);
-                        break;
+                if (mRTCAudioManger != null) {
+                    switch (mRTCAudioManger.getCurrentMode()) {
+                        case RTCAudioManger.MODE_SPEAKER:
+                            ivAnswer.setImageResource(R.drawable.grid_ic_hands_free);
+                            break;
+                        case RTCAudioManger.MODE_EARPIECE:
+                            ivAnswer.setImageResource(R.drawable.grid_ic_speak);
+                            break;
+                    }
+                    break;
                 }
-                break;
             case TYPE_CALLED:
                 layoutUserInfo.setVisibility(View.VISIBLE);
                 layoutCallInvite.setVisibility(View.GONE);

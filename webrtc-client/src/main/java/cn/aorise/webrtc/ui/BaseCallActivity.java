@@ -7,7 +7,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
-import android.graphics.Point;
 import android.media.MediaPlayer;
 import android.media.RingtoneManager;
 import android.os.Build;
@@ -26,7 +25,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.webrtc.Camera1Enumerator;
 import org.webrtc.Camera2Enumerator;
-import org.webrtc.CameraEnumerationAndroid;
 import org.webrtc.CameraEnumerator;
 import org.webrtc.CameraVideoCapturer;
 import org.webrtc.DataChannel;
@@ -39,6 +37,8 @@ import org.webrtc.PeerConnection;
 import org.webrtc.RendererCommon;
 import org.webrtc.SessionDescription;
 import org.webrtc.SurfaceViewRenderer;
+import org.webrtc.VideoFrame;
+import org.webrtc.VideoSink;
 import org.webrtc.VideoTrack;
 
 import java.util.List;
@@ -47,7 +47,6 @@ import cn.aorise.common.core.manager.ActivityManager;
 import cn.aorise.common.core.util.GsonUtils;
 import cn.aorise.common.core.util.SPUtils;
 import cn.aorise.common.core.util.ScreenUtils;
-import cn.aorise.common.core.util.SizeUtils;
 import cn.aorise.webrtc.R;
 import cn.aorise.webrtc.api.Constant;
 import cn.aorise.webrtc.chat.ChatClient;
@@ -137,7 +136,8 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
     private SurfaceViewRenderer surfaceRemote;
     private PercentFrameLayout layoutLocalVideo;
     private PercentFrameLayout layoutRemoteVideo;
-
+    private final ProxyVideoSink remoteProxyRenderer = new ProxyVideoSink();
+    private final ProxyVideoSink localProxyRenderer = new ProxyVideoSink();
     private SignalCallBack signalCallBack;
     private PhoneBroadcastReceive mPhoneBroadcastReceive;
     private boolean isInited = false;
@@ -159,6 +159,8 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
                         | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
         surfaceLocal = setSurfaceLocal();
         surfaceRemote = setSurfaceRemote();
+        localProxyRenderer.setTarget(surfaceLocal);
+        remoteProxyRenderer.setTarget(surfaceRemote);
         layoutLocalVideo = setLayoutLocalVideo();
         layoutRemoteVideo = setLayoutRemoteVideo();
         rootEglBase = EglBase.create();
@@ -842,7 +844,7 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
         if (mediaStream.videoTracks.size() == 1) {
             remoteVideoTrack = mediaStream.videoTracks.get(0);
             remoteVideoTrack.setEnabled(true);
-            remoteVideoTrack.addSink(surfaceRemote);
+            remoteVideoTrack.addSink(remoteProxyRenderer);
         }
     }
 
@@ -879,7 +881,7 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
                     videoCapturer = getVideoCapturer();
                     localVideoTrack = mWebRtcClient.createVideoTrack(mWebRtcClient.createVideoSource(videoCapturer, videoConstraints));
                     if (surfaceLocal != null) {
-                        localVideoTrack.addSink(surfaceLocal);
+                        localVideoTrack.addSink(localProxyRenderer);
                     }
                     mLocalStream.addTrack(localVideoTrack);
                 }
@@ -1120,6 +1122,24 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
                     }, PhoneStateListener.LISTEN_CALL_STATE);
                 }
             }
+        }
+    }
+
+    private static class ProxyVideoSink implements VideoSink {
+        private VideoSink target;
+
+        @Override
+        synchronized public void onFrame(VideoFrame frame) {
+            if (target == null) {
+                Logging.d(TAG, "Dropping frame in proxy because target is null.");
+                return;
+            }
+
+            target.onFrame(frame);
+        }
+
+        synchronized public void setTarget(VideoSink target) {
+            this.target = target;
         }
     }
 

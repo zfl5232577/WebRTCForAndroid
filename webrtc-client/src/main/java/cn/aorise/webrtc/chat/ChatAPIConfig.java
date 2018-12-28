@@ -1,7 +1,5 @@
 package cn.aorise.webrtc.chat;
 
-import cn.aorise.webrtc.BuildConfig;
-
 /**
  * <pre>
  *     author : Mark
@@ -12,16 +10,7 @@ import cn.aorise.webrtc.BuildConfig;
  * </pre>
  */
 public class ChatAPIConfig {
-    private String SIGNAL_URL;
-    private String TOKEN;
-    private String STUN_URL;
-    private String TURN_URL;
-    private String TURN_ACCOUNT;
-    private String TURN_PASSWORD;
-    private String UMENG_APPKEY;
-    private String UMENG_SECRET;
-    private String XIAOMI_ID;
-    private String XIAOMI_KEY;
+    private ConfigParams mConfigParams;
 
     /**
      * @param SIGNAL_URL    信令服务及WebSocket服务地址
@@ -36,55 +25,76 @@ public class ChatAPIConfig {
      * @param XIAOMI_KEY    小米push KEY
      */
     public ChatAPIConfig(String SIGNAL_URL, String TOKEN, String STUN_URL, String TURN_URL, String TURN_ACCOUNT, String TURN_PASSWORD, String UMENG_APPKEY, String UMENG_SECRET, String XIAOMI_ID, String XIAOMI_KEY) {
-        this.SIGNAL_URL = SIGNAL_URL;
-        this.TOKEN = TOKEN;
-        this.STUN_URL = STUN_URL;
-        this.TURN_URL = TURN_URL;
-        this.TURN_ACCOUNT = TURN_ACCOUNT;
-        this.TURN_PASSWORD = TURN_PASSWORD;
-        this.UMENG_APPKEY = UMENG_APPKEY;
-        this.UMENG_SECRET = UMENG_SECRET;
-        this.XIAOMI_ID = XIAOMI_ID;
-        this.XIAOMI_KEY = XIAOMI_KEY;
+        this.mConfigParams = new ConfigParams();
+        this.mConfigParams.setSIGNAL_URL(SIGNAL_URL);
+        this.mConfigParams.setTOKEN(TOKEN);
+        this.mConfigParams.setSTUN_URL(STUN_URL);
+        this.mConfigParams.setTURN_URL(TURN_URL);
+        this.mConfigParams.setTURN_ACCOUNT(TURN_ACCOUNT);
+        this.mConfigParams.setTURN_PASSWORD(TURN_PASSWORD);
+        this.mConfigParams.setUMENG_APPKEY(UMENG_APPKEY);
+        this.mConfigParams.setUMENG_SECRET(UMENG_SECRET);
+        this.mConfigParams.setXIAOMI_ID(XIAOMI_ID);
+        this.mConfigParams.setXIAOMI_KEY(XIAOMI_KEY);
     }
 
-    public String getSIGNAL_URL() {
-        return SIGNAL_URL;
+    public ChatAPIConfig(ConfigParams configParams){
+        this.mConfigParams = configParams;
     }
 
-    public String getTOKEN() {
-        return TOKEN;
+    public ConfigParams getConfigParams() {
+        return mConfigParams;
     }
 
-    public String getSTUN_URL() {
-        return STUN_URL;
-    }
+    public static class Builder{
+        private ConfigParams mConfigParams;
 
-    public String getTURN_URL() {
-        return TURN_URL;
-    }
+        public Builder() {
+            mConfigParams = new ConfigParams();
+        }
 
-    public String getTURN_ACCOUNT() {
-        return TURN_ACCOUNT;
-    }
+        public Builder signalUrl(String SIGNAL_URL){
+            this.mConfigParams.setSIGNAL_URL(SIGNAL_URL);
+            return this;
+        }
+        public Builder token(String TOKEN){
+            this.mConfigParams.setTOKEN(TOKEN);
+            return this;
+        }
+        public Builder stunUrl(String STUN_URL){
+            this.mConfigParams.setSTUN_URL(STUN_URL);
+            return this;
+        }
+        public Builder turnUrl(String TURN_URL){
+            this.mConfigParams.setTURN_URL(TURN_URL);
+            return this;
+        }
+        public Builder turnAccountAndPassword(String TURN_ACCOUNT,String TURN_PASSWORD){
+            this.mConfigParams.setTURN_ACCOUNT(TURN_ACCOUNT);
+            this.mConfigParams.setTURN_PASSWORD(TURN_PASSWORD);
+            return this;
+        }
 
-    public String getTURN_PASSWORD() {
-        return TURN_PASSWORD;
-    }
+        public Builder umengPush(String UMENG_APPKEY,String UMENG_SECRET){
+            this.mConfigParams.setUMENG_APPKEY(UMENG_APPKEY);
+            this.mConfigParams.setUMENG_SECRET(UMENG_SECRET);
+            return this;
+        }
 
-    public String getUMENG_APPKEY() {
-        return UMENG_APPKEY;
-    }
+        public Builder xiaomiPush(String XIAOMI_ID,String XIAOMI_KEY){
+            this.mConfigParams.setXIAOMI_ID(XIAOMI_ID);
+            this.mConfigParams.setXIAOMI_KEY(XIAOMI_KEY);
+            return this;
+        }
 
-    public String getUMENG_SECRET() {
-        return UMENG_SECRET;
-    }
+        public Builder meizuPush(String meizuAppId,String meizuAppKey){
+            this.mConfigParams.setMEIZUAPP_ID(meizuAppId);
+            this.mConfigParams.setMEIZUAPP_KEY(meizuAppKey);
+            return this;
+        }
 
-    public String getXIAOMI_ID() {
-        return XIAOMI_ID;
-    }
-
-    public String getXIAOMI_KEY() {
-        return XIAOMI_KEY;
+        public ChatAPIConfig build(){
+            return new ChatAPIConfig(mConfigParams);
+        }
     }
 }

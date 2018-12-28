@@ -1,6 +1,6 @@
 package cn.aorise.webrtc.signal;
 
-import cn.aorise.webrtc.provider.LifecycleEvent;
+import cn.aorise.webrtc.stomp.LifecycleEvent;
 import cn.aorise.webrtc.stomp.StompMessage;
 
 /**

@@ -1,33 +1,23 @@
 package cn.aorise.webrtc.stomp;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+import android.util.Log;
+
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
-import cn.aorise.webrtc.api.API;
-import cn.aorise.webrtc.api.Constant;
-import cn.aorise.webrtc.common.Mlog;
-import cn.aorise.webrtc.provider.ConnectionProvider;
-import cn.aorise.webrtc.provider.LifecycleEvent;
-import cn.aorise.webrtc.signal.SignalCallBack;
 import io.reactivex.BackpressureStrategy;
+import io.reactivex.Completable;
+import io.reactivex.CompletableSource;
 import io.reactivex.Flowable;
-import io.reactivex.FlowableEmitter;
-import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
-import io.reactivex.flowables.ConnectableFlowable;
-import io.reactivex.schedulers.Schedulers;
-import okhttp3.WebSocket;
+import io.reactivex.subjects.BehaviorSubject;
+import io.reactivex.subjects.PublishSubject;
+
 
 public class StompClient {
 
@@ -36,257 +26,276 @@ public class StompClient {
     public static final String SUPPORTED_VERSIONS = "1.1,1.0";
     public static final String DEFAULT_ACK = "auto";
 
-    private static StompClient instance;
-    //private static String url = "wss://sphj.zhihuixupu.com:443/ws/signaling";
-
-    private Disposable mMessagesDisposable;
-    private Disposable mLifecycleDisposable;
-    private Disposable mtTopicMessageDisposable;
-    private Disposable mtTopicErrorDisposable;
-    private Disposable mtTopicPingDisposable;
-    private Map<String, Set<FlowableEmitter<? super StompMessage>>> mEmitters = new ConcurrentHashMap<>();
-    private List<ConnectableFlowable<Void>> mWaitConnectionFlowables;
-    private ConnectionProvider mConnectionProvider;
-    private HashMap<String, String> mTopics;
-    private SignalCallBack signalCallBack;
+    private final String tag = StompClient.class.getSimpleName();
+    private final ConnectionProviderImp mConnectionProvider;
+    private ConcurrentHashMap<String, String> mTopics;
     private boolean mConnected;
     private boolean isConnecting;
+    private boolean legacyWhitespace;
 
-    public static StompClient getInstance() {
-        synchronized (StompClient.class) {
-            if (instance == null) {
-                HashMap<String,String> connectHttpHeaders = new HashMap<>();
-                connectHttpHeaders.put("token",API.TOKEN);
-                connectHttpHeaders.put("username", Constant.LoginInfo.user.getUserName());
-                connectHttpHeaders.put("device-type", Constant.DeviceType.MOBILE);
-                try {
-                    connectHttpHeaders.put("name", URLEncoder.encode(Constant.LoginInfo.user.getNickName(), "UTF-8"));
-                } catch (UnsupportedEncodingException e) {
-                    e.printStackTrace();
-                }
-                instance = Stomp.over(WebSocket.class, API.SIGNAL_URL,connectHttpHeaders,"");
-            }
-        }
-        return instance;
+    private PublishSubject<StompMessage> mMessageStream;
+    private ConcurrentHashMap<String, Flowable<StompMessage>> mStreamMap;
+    private final BehaviorSubject<Boolean> mConnectionStream;
+    private Parser parser;
+    private Disposable mLifecycleDisposable;
+    private Disposable mMessagesDisposable;
+    private List<StompHeader> mHeaders;
+    private int heartbeat;
+
+    public StompClient(ConnectionProviderImp connectionProvider) {
+        mConnectionProvider = connectionProvider;
+        mMessageStream = PublishSubject.create();
+        mStreamMap = new ConcurrentHashMap<>();
+        mConnectionStream = BehaviorSubject.createDefault(false);
+        parser = Parser.NONE;
     }
 
-    public StompClient(ConnectionProvider connectionProvider) {
-        mConnectionProvider = connectionProvider;
-        mWaitConnectionFlowables = new CopyOnWriteArrayList<>();
-        mtTopicMessageDisposable = topic("/user/topic/message")
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(topicMessage -> {
-                    if (signalCallBack != null) {
-                        signalCallBack.onMessage(topicMessage);
-                    }
-                });
-
-        mtTopicErrorDisposable = topic("/user/topic/error")
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(topicMessage -> {
-                    if (signalCallBack != null) {
-                        signalCallBack.onMessage(topicMessage);
-                    }
-                });
-
-        mtTopicPingDisposable = topic("/user/topic/ping")
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(topicMessage -> {
-                    if (signalCallBack != null) {
-                        signalCallBack.onPingMessage();
-                    }
-                });
-        mLifecycleDisposable = mConnectionProvider.getLifecycleReceiver()
-                .subscribe(lifecycleEvent -> {
-                    switch (lifecycleEvent.getType()) {
-                        case OPENED:
-                            connectOpen();
-                            if (signalCallBack != null) {
-                                signalCallBack.onOpen(lifecycleEvent);
-                            }
-                            break;
-                        case CLOSED:
-                            mConnected = false;
-                            isConnecting = false;
-                            if (signalCallBack != null) {
-                                signalCallBack.onClosed(lifecycleEvent);
-                            }
-                            break;
-                        case ERROR:
-                            mConnected = false;
-                            isConnecting = false;
-                            if (signalCallBack != null) {
-                                signalCallBack.onError(lifecycleEvent);
-                            }
-                            break;
-                    }
-                });
-        mMessagesDisposable = mConnectionProvider.messages()
-                .map(StompMessage::from)
-                .subscribe(stompMessage -> {
-                    if (stompMessage.getStompCommand().equals(StompCommand.CONNECTED)) {
-                        connected();
-                        if (signalCallBack != null) {
-                            signalCallBack.onConnected();
-                        }
-                    }
-                    callSubscribers(stompMessage);
-                });
+    public enum Parser {
+        NONE,
+        RABBITMQ
     }
 
     /**
-     * If already connected and reconnect=false - nope
+     * Set the wildcard parser for Topic subscription.
+     * <p>
+     * Right now, the only options are NONE and RABBITMQ.
+     * <p>
+     * When set to RABBITMQ, topic subscription allows for RMQ-style wildcards.
+     * <p>
+     * See more info <a href="https://www.rabbitmq.com/tutorials/tutorial-five-java.html">here</a>.
+     *
+     * @param parser Set to NONE by default
      */
-    public void connect(SignalCallBack signalCallBack) {
-        Mlog.e(TAG, "connect: " );
-        if (mConnected || isConnecting) {
+    public void setParser(Parser parser) {
+        this.parser = parser;
+    }
+
+    /**
+     * Sets the heartbeat interval to request from the server.
+     * <p>
+     * Not very useful yet, because we don't have any heartbeat logic on our side.
+     *
+     * @param ms heartbeat time in milliseconds
+     */
+    public void setHeartbeat(int ms) {
+        heartbeat = ms;
+        mConnectionProvider.setHeartbeat(ms).subscribe();
+    }
+
+    /**
+     * Connect without reconnect if connected
+     */
+    public void connect() {
+        connect(null);
+    }
+
+    /**
+     * Connect to websocket. If already connected, this will silently fail.
+     *
+     * @param _headers HTTP headers to send in the INITIAL REQUEST, i.e. during the protocol upgrade
+     */
+    public void connect(@Nullable List<StompHeader> _headers) {
+
+        Log.d(TAG, "Connect");
+
+        mHeaders = _headers;
+
+        if (mConnected) {
+            Log.d(TAG, "Already connected, ignore");
             return;
         }
-        this.signalCallBack = signalCallBack;
+        mLifecycleDisposable = mConnectionProvider.lifecycle()
+                .subscribe(lifecycleEvent -> {
+                    switch (lifecycleEvent.getType()) {
+                        case OPENED:
+                            List<StompHeader> headers = new ArrayList<>();
+                            headers.add(new StompHeader(StompHeader.VERSION, SUPPORTED_VERSIONS));
+                            headers.add(new StompHeader(StompHeader.HEART_BEAT, "0," + heartbeat));
+                            if (_headers != null) headers.addAll(_headers);
+                            mConnectionProvider.send(new StompMessage(StompCommand.CONNECT, headers, null).compile(legacyWhitespace))
+                                    .subscribe();
+                            break;
+
+                        case CLOSED:
+                            Log.d(TAG, "Socket closed");
+                            setConnected(false);
+                            isConnecting = false;
+                            break;
+
+                        case ERROR:
+                            Log.d(TAG, "Socket closed with error");
+                            setConnected(false);
+                            isConnecting = false;
+                            break;
+                    }
+                });
+
         isConnecting = true;
-        mConnectionProvider.connect();
+        mMessagesDisposable = mConnectionProvider.messages()
+                .map(StompMessage::from)
+                .doOnNext(this::callSubscribers)
+                .filter(msg -> msg.getStompCommand().equals(StompCommand.CONNECTED))
+                .subscribe(stompMessage -> {
+                    setConnected(true);
+                    isConnecting = false;
+
+                });
     }
 
-    public void reconnect(){
-        Mlog.e(TAG, "reconnect: " );
-        if (mConnected || isConnecting) {
-            return;
-        }
-        isConnecting = true;
-        mConnectionProvider.reconnect();
+    private void setConnected(boolean connected) {
+        mConnected = connected;
+        mConnectionStream.onNext(mConnected);
     }
 
-    private void connected() {
-        mConnected = true;
-        isConnecting = false;
-        for (ConnectableFlowable<Void> flowable : mWaitConnectionFlowables) {
-            flowable.connect();
-        }
-        mWaitConnectionFlowables.clear();
+    /**
+     * Disconnect from server, and then reconnect with the last-used headers
+     */
+    public void reconnect() {
+        disconnectCompletable()
+                .subscribe(() -> connect(mHeaders),
+                        e -> Log.e(tag, "Disconnect error", e));
     }
 
-    private void connectOpen() {
-        List<StompHeader> headers = new ArrayList<>();
-        headers.add(new StompHeader(StompHeader.VERSION, SUPPORTED_VERSIONS));
-        mConnectionProvider.send(new StompMessage(StompCommand.CONNECT, headers, null).compile())
-                .subscribe();
+    public Completable send(String destination) {
+        return send(destination, null);
     }
 
-    public Flowable<Void> send(String destination) {
-        return send(new StompMessage(
-                StompCommand.SEND,
-                Collections.singletonList(new StompHeader(StompHeader.DESTINATION, destination)),
-                null));
-    }
-
-    public Flowable<Void> send(String destination, String data) {
+    public Completable send(String destination, String data) {
         return send(new StompMessage(
                 StompCommand.SEND,
                 Collections.singletonList(new StompHeader(StompHeader.DESTINATION, destination)),
                 data));
     }
 
-    public Flowable<Void> send(StompMessage stompMessage) {
-        Flowable<Void> flowable = mConnectionProvider.send(stompMessage.compile());
-        if (!mConnected) {
-            ConnectableFlowable<Void> deffered = flowable.publish();
-            mWaitConnectionFlowables.add(deffered);
-            return deffered;
-        } else {
-            return flowable;
-        }
+    public Completable send(@NonNull StompMessage stompMessage) {
+        Completable completable = mConnectionProvider.send(stompMessage.compile(legacyWhitespace));
+        CompletableSource connectionComplete = mConnectionStream
+                .filter(isConnected -> isConnected)
+                .firstOrError().toCompletable();
+        return completable
+                .startWith(connectionComplete);
     }
 
     private void callSubscribers(StompMessage stompMessage) {
-        String messageDestination = stompMessage.findHeader(StompHeader.DESTINATION);
-        for (String dest : mEmitters.keySet()) {
-            if (dest.equals(messageDestination)) {
-                for (FlowableEmitter<? super StompMessage> subscriber : mEmitters.get(dest)) {
-                    subscriber.onNext(stompMessage);
-                }
-                return;
-            }
-        }
+        mMessageStream.onNext(stompMessage);
     }
 
     public Flowable<LifecycleEvent> lifecycle() {
-        return mConnectionProvider.getLifecycleReceiver();
+        return mConnectionProvider.lifecycle().toFlowable(BackpressureStrategy.BUFFER);
     }
 
     public void disconnect() {
-        if (mtTopicMessageDisposable!=null){
-            mtTopicMessageDisposable.dispose();
-            mtTopicMessageDisposable =null;
-        }
-        if (mtTopicErrorDisposable!=null){
-            mtTopicErrorDisposable.dispose();
-            mtTopicErrorDisposable =null;
-        }
-        if (mtTopicPingDisposable!=null){
-            mtTopicPingDisposable.dispose();
-            mtTopicPingDisposable =null;
+        disconnectCompletable().subscribe(() -> {}, e -> Log.e(tag, "Disconnect error", e));
+    }
+
+    public Completable disconnectCompletable() {
+        if (mLifecycleDisposable != null) {
+            mLifecycleDisposable.dispose();
         }
         if (mMessagesDisposable != null) {
             mMessagesDisposable.dispose();
-            mMessagesDisposable = null;
         }
-        if (mLifecycleDisposable != null) {
-            mLifecycleDisposable.dispose();
-            mLifecycleDisposable = null;
-        }
-        if (mConnectionProvider != null) {
-            mConnectionProvider.close();
-            mConnectionProvider = null;
-        }
-        mConnected = false;
-        isConnecting = false;
-        instance = null;
+        return mConnectionProvider.disconnect()
+                .doOnComplete(() -> setConnected(false));
     }
 
     public Flowable<StompMessage> topic(String destinationPath) {
         return topic(destinationPath, null);
     }
 
-    public Flowable<StompMessage> topic(String destinationPath, List<StompHeader> headerList) {
-        return Flowable.<StompMessage>create(emitter -> {
-            Set<FlowableEmitter<? super StompMessage>> emittersSet = mEmitters.get(destinationPath);
-            if (emittersSet == null) {
-                emittersSet = new HashSet<>();
-                mEmitters.put(destinationPath, emittersSet);
-                subscribePath(destinationPath, headerList).subscribe();
-            }
-            emittersSet.add(emitter);
-        }, BackpressureStrategy.BUFFER)
-                .doOnCancel(() -> {
-                    Iterator<String> mapIterator = mEmitters.keySet().iterator();
-                    while (mapIterator.hasNext()) {
-                        String destinationUrl = mapIterator.next();
-                        Set<FlowableEmitter<? super StompMessage>> set = mEmitters.get(destinationUrl);
-                        Iterator<FlowableEmitter<? super StompMessage>> setIterator = set.iterator();
-                        while (setIterator.hasNext()) {
-                            FlowableEmitter<? super StompMessage> subscriber = setIterator.next();
-                            if (subscriber.isCancelled()) {
-                                setIterator.remove();
-                                if (set.size() < 1) {
-                                    mapIterator.remove();
-                                    unsubscribePath(destinationUrl).subscribe();
-                                }
-                            }
-                        }
-                    }
-                });
+    public Flowable<StompMessage> topic(@NonNull String destPath, List<StompHeader> headerList) {
+        if (destPath == null)
+            return Flowable.error(new IllegalArgumentException("Topic path cannot be null"));
+        else if (!mStreamMap.containsKey(destPath))
+            mStreamMap.put(destPath,
+                    mMessageStream
+                            .filter(msg -> matches(destPath, msg))
+                            .toFlowable(BackpressureStrategy.BUFFER)
+                            .doOnSubscribe(disposable -> subscribePath(destPath, headerList).subscribe())
+                            .doFinally(() -> unsubscribePath(destPath).subscribe())
+                            .share()
+            );
+        return mStreamMap.get(destPath);
     }
 
-    private Flowable<Void> subscribePath(String destinationPath, List<StompHeader> headerList) {
-        if (destinationPath == null) return Flowable.empty();
+    /**
+     * Reverts to the old frame formatting, which included two newlines between the message body
+     * and the end-of-frame marker.
+     * <p>
+     * Legacy: Body\n\n^@
+     * <p>
+     * Default: Body^@
+     *
+     * @param legacyWhitespace whether to append an extra two newlines
+     * @see <a href="http://stomp.github.io/stomp-specification-1.2.html#STOMP_Frames">The STOMP spec</a>
+     */
+    public void setLegacyWhitespace(boolean legacyWhitespace) {
+        this.legacyWhitespace = legacyWhitespace;
+    }
+
+    private boolean matches(String path, StompMessage msg) {
+        String dest = msg.findHeader(StompHeader.DESTINATION);
+        if (dest == null) return false;
+        boolean ret;
+
+        switch (parser) {
+            case NONE:
+                ret = path.equals(dest);
+                break;
+
+            case RABBITMQ:
+                // for example string "lorem.ipsum.*.sit":
+
+                // split it up into ["lorem", "ipsum", "*", "sit"]
+                String[] split = path.split("\\.");
+                ArrayList<String> transformed = new ArrayList<>();
+                // check for wildcards and replace with corresponding regex
+                for (String s : split) {
+                    switch (s) {
+                        case "*":
+                            transformed.add("[^.]+");
+                            break;
+                        case "#":
+                            // TODO: make this work with zero-word
+                            // e.g. "lorem.#.dolor" should ideally match "lorem.dolor"
+                            transformed.add(".*");
+                            break;
+                        default:
+                            transformed.add(s);
+                            break;
+                    }
+                }
+                // at this point, 'transformed' looks like ["lorem", "ipsum", "[^.]+", "sit"]
+                StringBuilder sb = new StringBuilder();
+                for (String s : transformed) {
+                    if (sb.length() > 0) sb.append("\\.");
+                    sb.append(s);
+                }
+                String join = sb.toString();
+                // join = "lorem\.ipsum\.[^.]+\.sit"
+
+                ret = dest.matches(join);
+                break;
+
+            default:
+                ret = false;
+                break;
+        }
+
+        return ret;
+    }
+
+    private Completable subscribePath(String destinationPath, @Nullable List<StompHeader> headerList) {
         String topicId = UUID.randomUUID().toString();
 
-        if (mTopics == null) {
-            mTopics = new HashMap<>();
+        if (mTopics == null) mTopics = new ConcurrentHashMap<>();
+
+        // Only continue if we don't already have a subscription to the topic
+        if (mTopics.containsKey(destinationPath)) {
+            Log.d(TAG, "Attempted to subscribe to already-subscribed path!");
+            return Completable.complete();
         }
+
         mTopics.put(destinationPath, topicId);
         List<StompHeader> headers = new ArrayList<>();
         headers.add(new StompHeader(StompHeader.ID, topicId));
@@ -298,13 +307,23 @@ public class StompClient {
     }
 
 
-    private Flowable<Void> unsubscribePath(String dest) {
+    private Completable unsubscribePath(String dest) {
+        mStreamMap.remove(dest);
+
         String topicId = mTopics.get(dest);
+        mTopics.remove(dest);
+
+        Log.d(TAG, "Unsubscribe path: " + dest + " id: " + topicId);
+
         return send(new StompMessage(StompCommand.UNSUBSCRIBE,
                 Collections.singletonList(new StompHeader(StompHeader.ID, topicId)), null));
     }
 
     public boolean isConnected() {
         return mConnected;
+    }
+
+    public boolean isConnecting() {
+        return isConnecting;
     }
 }

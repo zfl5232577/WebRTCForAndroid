@@ -12,6 +12,9 @@ public class SignalMessage {
     private String type;
     private String senderName;
     private String senderImgurl;
+    private String extras;
+    private int limit = 1;
+    private boolean audioFlag;
 
     public SignalMessage(String sender, String recipient, String data, String type, String senderName, String senderImgurl) {
         this.sender = sender;
@@ -20,6 +23,35 @@ public class SignalMessage {
         this.type = type;
         this.senderName = senderName;
         this.senderImgurl = senderImgurl;
+    }
+
+    public SignalMessage(String sender, String recipient, String data, String type, String senderName, String senderImgurl, boolean audioFlag) {
+        this(sender, recipient, data, type, senderName, senderImgurl);
+        this.audioFlag = audioFlag;
+    }
+
+    public int getLimit() {
+        return limit;
+    }
+
+    public void setLimit(int limit) {
+        this.limit = limit;
+    }
+
+    public String getExtras() {
+        return extras;
+    }
+
+    public void setExtras(String extras) {
+        this.extras = extras;
+    }
+
+    public boolean isAudioFlag() {
+        return audioFlag;
+    }
+
+    public void setAudioFlag(boolean audioFlag) {
+        this.audioFlag = audioFlag;
     }
 
     public String getSender() {

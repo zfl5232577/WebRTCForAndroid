@@ -3,6 +3,7 @@ package cn.aorise.webrtc.ui;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 
 import cn.aorise.common.core.util.SPUtils;
 import cn.aorise.webrtc.api.Constant;
@@ -25,14 +26,22 @@ public class BootBroadcastReceiver extends BroadcastReceiver {
             if (Constant.LoginInfo.isLogin) {
                 if (!Utils.isServiceWork(context, ChatService.SERVICE_NAME)) {
                     Intent service = new Intent(context, ChatService.class);
-                    context.startService(service);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(service);
+                    } else {
+                        context.startService(service);
+                    }
                 }
             }
         }else if (ACTION_CONNECTIVITY_CHANGE.equals(action)) {
             if (Constant.LoginInfo.isLogin) {
                 if (!Utils.isServiceWork(context, ChatService.SERVICE_NAME)) {
                     Intent service = new Intent(context, ChatService.class);
-                    context.startService(service);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(service);
+                    } else {
+                        context.startService(service);
+                    }
                 }
             }
         }

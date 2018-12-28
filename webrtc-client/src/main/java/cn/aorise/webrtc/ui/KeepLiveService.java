@@ -30,7 +30,11 @@ public class KeepLiveService extends JobService {
         Log.e(TAG, "onStartJob: 拉活应用" );
         if (!Utils.isServiceWork(this , ChatService.SERVICE_NAME)) {
             Intent service = new Intent(this, ChatService.class);
-            this.startService(service);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(service);
+            } else {
+                startService(service);
+            }
         }
         return false;
     }

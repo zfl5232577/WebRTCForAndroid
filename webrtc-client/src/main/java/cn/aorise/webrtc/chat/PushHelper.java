@@ -30,6 +30,7 @@ import java.util.Hashtable;
 public class PushHelper {
     private static final String TAG = PushHelper.class.getSimpleName();
     private static PushHelper instance;
+    private boolean isSuccess;//是否注册成功
 
     private PushHelper() {
     }
@@ -71,6 +72,7 @@ public class PushHelper {
         //初始化组件化基础库, 统计SDK/推送SDK/分享SDK都必须调用此初始化接口
         UMConfigure.init(context, appkey, channel, UMConfigure.DEVICE_TYPE_PHONE,
                 pushSecret);
+        setLogEnabled(false);
     }
 
     /**
@@ -90,6 +92,7 @@ public class PushHelper {
         PushAgent.getInstance(context).register(new IUmengRegisterCallback() {
             @Override
             public void onSuccess(String deviceToken) {
+                isSuccess = true;
                 Log.i(TAG, "onSuccess: deviceToken:" + deviceToken);
                 //注册成功会返回device token
             }
@@ -131,9 +134,10 @@ public class PushHelper {
 
     /**
      * 关闭推送
+     *
      * @param context
      */
-    public void disable(Context context){
+    public void disable(Context context) {
         PushAgent.getInstance(context).disable(new IUmengCallback() {
             @Override
             public void onSuccess() {
@@ -149,9 +153,10 @@ public class PushHelper {
 
     /**
      * 打开推送
+     *
      * @param context
      */
-    public void enable(Context context){
+    public void enable(Context context) {
         PushAgent.getInstance(context).enable(new IUmengCallback() {
             @Override
             public void onSuccess() {
@@ -186,8 +191,9 @@ public class PushHelper {
      * 开发者可自定义用户点击通知栏时的后续动作。自定义行为的数据放在UMessage.custom字段。
      * 若开发者需要处理自定义行为，则可以重写方法dealWithCustomAction()。
      * 其中自定义行为的内容，存放在UMessage.custom中。请在自定义Application类中添加以下代码：
-     *
+     * <p>
      * 因此若需启动Activity，需为Intent添加Flag：Intent.FLAG_ACTIVITY_NEW_TASK，否则无法启动Activity。
+     *
      * @param context
      * @param notificationClickHandler
      */
@@ -198,6 +204,7 @@ public class PushHelper {
     /**
      * 自定义通知栏样式
      * msg.builder_id是服务器下发的消息字段，用来指定通知消息的样式。默认值为0。
+     *
      * @param context
      * @param messageHandler
      */
@@ -209,18 +216,20 @@ public class PushHelper {
      * 通知免打扰模式
      * SDK默认在“23:00”到“7:00
      * 如果需要改变默认的静音时间，如果需要改变默认的静音时间
+     *
      * @param context
      * @param startHour
      * @param startMinute
      * @param endHour
      * @param endMinute
      */
-    public void setNoDisturbMode(Context context,int startHour, int startMinute, int endHour, int endMinute) {
+    public void setNoDisturbMode(Context context, int startHour, int startMinute, int endHour, int endMinute) {
         PushAgent.getInstance(context).setNoDisturbMode(startHour, startMinute, endHour, endMinute);
     }
 
     /**
      * 添加标签
+     *
      * @param context
      * @param tags
      */
@@ -230,11 +239,12 @@ public class PushHelper {
             public void onMessage(final boolean isSuccess, final ITagManager.Result result) {
                 //isSuccess表示操作是否成功
             }
-        },tags);
+        }, tags);
     }
 
     /**
      * 删除标签
+     *
      * @param context
      * @param tags
      */
@@ -244,20 +254,22 @@ public class PushHelper {
             public void onMessage(final boolean isSuccess, final ITagManager.Result result) {
                 //isSuccess表示操作是否成功
             }
-        },tags);
+        }, tags);
     }
 
     /**
      * 获取服务器端的所有标签
+     *
      * @param context
      * @param tagListCallBack
      */
-    public void getTags(Context context,TagManager.TagListCallBack tagListCallBack) {
+    public void getTags(Context context, TagManager.TagListCallBack tagListCallBack) {
         PushAgent.getInstance(context).getTagManager().getTags(tagListCallBack);
     }
 
     /**
      * 加权标签是给标签增加了一个权值
+     *
      * @param context
      * @param hashtable
      */
@@ -271,10 +283,11 @@ public class PushHelper {
 
     /**
      * 删除加权标签
+     *
      * @param context
      * @param tags
      */
-    public void deleteWeightedTags(Context context,String... tags) {
+    public void deleteWeightedTags(Context context, String... tags) {
         PushAgent.getInstance(context).getTagManager().deleteWeightedTags(new TagManager.TCallBack() {
             @Override
             public void onMessage(final boolean isSuccess, final ITagManager.Result result) {
@@ -284,10 +297,11 @@ public class PushHelper {
 
     /**
      * 获取服务器端的所有加权标签
+     *
      * @param context
      * @param weightedTagListCallBack
      */
-    public void getWeightedTags(Context context,TagManager.WeightedTagListCallBack weightedTagListCallBack) {
+    public void getWeightedTags(Context context, TagManager.WeightedTagListCallBack weightedTagListCallBack) {
         PushAgent.getInstance(context).getTagManager().getWeightedTags(weightedTagListCallBack);
     }
 

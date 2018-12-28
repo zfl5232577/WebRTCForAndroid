@@ -14,14 +14,19 @@ import cn.aorise.webrtc.BuildConfig;
  * </pre>
  */
 public class Mlog {
+    public static boolean enabled = BuildConfig.DEBUG;
+
+    public static void setLogEnabled(boolean enabled){
+        Mlog.enabled = enabled;
+    }
     public static void e(String tag, String msg) {
-        if (BuildConfig.DEBUG) {
+        if (enabled) {
             Log.e(tag, msg);
         }
     }
 
     public static void i(String tag, String msg) {
-        if (BuildConfig.DEBUG) {
+        if (enabled) {
             Log.i(tag, msg);
         }
     }

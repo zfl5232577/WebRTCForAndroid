@@ -1,5 +1,6 @@
 package cn.aorise.webrtc.stomp;
 
+
 public class StompCommand {
 
     public static final String CONNECT = "CONNECT";

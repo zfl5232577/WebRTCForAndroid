@@ -10,33 +10,32 @@
     <uses-feature android:name="android.hardware.camera.front" />
     <uses-feature android:name="android.hardware.microphone" />
 
-
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.DISABLE_KEYGUARD"/>
+    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.DEVICE_POWER" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
 
     <application android:allowBackup="true">
-
-        <activity
-            android:name=".ui.CallActivity"
-            android:label="@string/grid_title_activity_call"
-            android:screenOrientation="portrait" />
         <activity
             android:name=".ui.DefaultCallActivity"
+            android:exported="true"
             android:label="@string/grid_title_activity_call"
+            android:launchMode="singleTask"
             android:screenOrientation="portrait" />
-        <activity android:name=".ui.PushActivity"
-            android:launchMode="singleTask"/>
+        <activity
+            android:name=".ui.PushActivity"
+            android:exported="true"
+            android:launchMode="singleTask" />
         <activity
             android:name=".ui.DaemonActivity"
             android:alwaysRetainTaskState="true"
@@ -48,29 +47,42 @@
             android:noHistory="true"
             android:showOnLockScreen="true"
             android:taskAffinity="android.task.push"
-            android:theme="@style/DaemonActivity"/>
+            android:theme="@style/DaemonActivity" />
 
-        <service android:name=".ui.KeepLiveService"
-            android:permission="android.permission.BIND_JOB_SERVICE"/>
-
+        <service
+            android:name=".ui.KeepLiveService"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
         <service
             android:name=".ui.ChatService"
             android:enabled="true"
             android:exported="true"
-            android:persistent="true"/>
+            android:persistent="true" />
 
         <receiver android:name=".ui.BootBroadcastReceiver">
             <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.USER_PRESENT" />
+
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             <intent-filter android:priority="1000">
                 <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
             </intent-filter>
         </receiver>
+
+        <activity
+            android:name=".ui.DuplicateActivity"
+            android:alwaysRetainTaskState="true"
+            android:autoRemoveFromRecents="true"
+            android:excludeFromRecents="true"
+            android:icon="@color/transparent"
+            android:label=" "
+            android:noHistory="true"
+            android:showOnLockScreen="true"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="portrait"
+            android:theme="@style/DuplicateActivity"/>
     </application>
-
-
 
 </manifest>

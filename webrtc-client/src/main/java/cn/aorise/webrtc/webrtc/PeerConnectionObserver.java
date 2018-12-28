@@ -1,9 +1,12 @@
 package cn.aorise.webrtc.webrtc;
 
+import android.util.Log;
+
 import org.webrtc.DataChannel;
 import org.webrtc.IceCandidate;
 import org.webrtc.MediaStream;
 import org.webrtc.PeerConnection;
+import org.webrtc.RtpReceiver;
 import org.webrtc.SdpObserver;
 import org.webrtc.SessionDescription;
 
@@ -59,6 +62,11 @@ public class PeerConnectionObserver implements SdpObserver, PeerConnection.Obser
     }
 
     @Override
+    public void onIceCandidatesRemoved(IceCandidate[] candidates) {
+        Log.e("BaseCallActivity", "onIceCandidatesRemoved: " );
+    }
+
+    @Override
     public void onAddStream(MediaStream mediaStream) {
        mPeerConnectionListener.onAddStream(mediaStream);
     }
@@ -76,6 +84,11 @@ public class PeerConnectionObserver implements SdpObserver, PeerConnection.Obser
     @Override
     public void onRenegotiationNeeded() {
         mPeerConnectionListener.onRenegotiationNeeded();
+    }
+
+    @Override
+    public void onAddTrack(RtpReceiver receiver, MediaStream[] mediaStreams) {
+
     }
 
     @Override

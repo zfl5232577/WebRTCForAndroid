@@ -29,7 +29,7 @@
 
     <!-- 视频 -->
     <string name="grid_call_receive_video">向你发起视频</string>
-    <string name="grid_call_disconnect">连接断开，请重试</string>
+    <string name="grid_call_disconnect">网络波动，请重新连接</string>
     <string name="grid_call_wait_answer">等待对方接受邀请</string>
     <string name="grid_call_audio_mode_headset_insert">已插入耳机，请拔出耳机再切换</string>
     <string name="grid_call_answer">接听</string>

@@ -3,6 +3,7 @@ package cn.aorise.webrtc.chat;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.ActivityManager;
+import android.app.Application;
 import android.app.Service;
 import android.app.job.JobInfo;
 import android.app.job.JobScheduler;
@@ -14,10 +15,14 @@ import android.content.IntentFilter;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Build;
+import android.text.TextUtils;
 import android.util.Log;
 
 import com.umeng.commonsdk.UMConfigure;
 
+import org.webrtc.PeerConnection;
+
+import java.util.LinkedList;
 import java.util.List;
 
 import cn.aorise.webrtc.api.API;
@@ -39,11 +44,13 @@ import cn.aorise.webrtc.ui.KeepLiveService;
  */
 public class ChatClient {
     private static final String TAG = ChatClient.class.getSimpleName();
+    private LinkedList<PeerConnection.IceServer> iceServers = new LinkedList<>();
     private static ChatClient instance = null;
     private Network currentNetworkType;
     private Context mContext;
     private BroadcastReceiver connectivityBroadcastReceiver;
     private OnDuplicateConnectionCallback onDuplicateConnectionCallback;
+    private OnPushCallback mOnPushCallback;
     private ConnectivityManager connManager;
     private SignalManager mSignalManager;
     private Class<? extends Activity> callActivity = DefaultCallActivity.class;
@@ -89,7 +96,6 @@ public class ChatClient {
                         boolean hasNetwork = currentNetworkType != Network.NETWORK_NONE;
                         Constant.hasNetWork = hasNetwork;
                         if (hasNetwork) {
-                            Mlog.i(TAG, "Network availability changed, notify... " + currentNetworkType);
                             if (mSignalManager != null) {
                                 mSignalManager.onNetworkChanged();
                             }
@@ -102,10 +108,12 @@ public class ChatClient {
 
     /**
      * 全局初始化，在工程Application的onCreate方法对用
-     * @param context 上下文
+     *
+     * @param context       上下文
      * @param chatApiConfig 配置参数对象
      */
     public void init(Context context, ChatAPIConfig chatApiConfig) {
+        cn.aorise.common.core.util.Utils.init((Application) context.getApplicationContext());
         setAPI(chatApiConfig);
         /*
         * 友盟推送子子进程也需要初始化，所以提到前面来
@@ -114,17 +122,18 @@ public class ChatClient {
         PushHelper.getInstance().init(context, API.UMENG_APPKEY, "Umeng", API.UMENG_SECRET);
         PushHelper.getInstance().register(context);
         PushHelper.getInstance().registerHWPush(context);
-        PushHelper.getInstance().registerXMPush(context,API.XIAOMI_ID,API.XIAOMI_KEY);
+        PushHelper.getInstance().registerXMPush(context, API.XIAOMI_ID, API.XIAOMI_KEY);
+        PushHelper.getInstance().registerMeizuPush(context, API.MEIZUAPP_ID, API.MEIZUAPP_KEY);
 
         if (!context.getPackageName().equals(getProcessName(context))) {
-            Mlog.e(TAG, " not in main process, return" );
+            Mlog.e(TAG, " not in main process, return");
             return;
         }
         this.mContext = context.getApplicationContext();
         connManager = (ConnectivityManager) context.getSystemService(Service.CONNECTIVITY_SERVICE);
     }
 
-    public void login(String userName,String nickName,String userIcon) {
+    public void login(String userName, String nickName, String userIcon) {
         if (mContext == null) {
             return;
         }
@@ -135,15 +144,22 @@ public class ChatClient {
         user.setNickName(nickName);
         user.setUserIcon(userIcon);
         Constant.LoginInfo.user = user;
-        PushHelper.getInstance().setAlias(mContext,user.getUserName(), Constant.ALIAS_TYPE.USER);
+        PushHelper.getInstance().setAlias(mContext, user.getUserName(), Constant.ALIAS_TYPE.USER);
         mSignalManager = new SignalManager(mContext);
         mSignalManager.init();
         doStartService();
         scheduleJob();
     }
 
+    public void reconnet() {
+        if (mSignalManager != null) {
+            mSignalManager.reconnect(true);
+        }
+    }
+
     /**
      * 获取视频页面的实际页面
+     *
      * @return
      */
     public Class<? extends Activity> getCallActivity() {
@@ -152,11 +168,23 @@ public class ChatClient {
 
     /**
      * 开发者定义自己的视频呼叫页面后调用该函数指定
+     *
      * @param callActivity
      */
     public void setCallActivity(Class<? extends Activity> callActivity) {
         this.callActivity = callActivity;
     }
+
+    /**
+     * 设置日志开关
+     *
+     * @param enabled
+     */
+    public void setLogEnabled(boolean enabled) {
+        PushHelper.getInstance().setLogEnabled(enabled);
+        Mlog.setLogEnabled(enabled);
+    }
+
 
     public SignalManager getSignalManager() {
         return mSignalManager;
@@ -173,7 +201,7 @@ public class ChatClient {
         if (connectivityBroadcastReceiver != null) {
             mContext.unregisterReceiver(connectivityBroadcastReceiver);
         }
-        PushHelper.getInstance().onDestroy(mContext,Constant.LoginInfo.user.getUserName());
+        PushHelper.getInstance().onDestroy(mContext, Constant.LoginInfo.user.getUserName());
         Constant.LoginInfo.isLogin = false;
         mSignalManager.disconnect();
         doStopService();
@@ -242,10 +270,24 @@ public class ChatClient {
 
     /**
      * 设置登陆冲突后弹窗的回调函数
+     *
      * @param onDuplicateConnectionCallback
      */
     public void setOnDuplicateConnectionCallback(OnDuplicateConnectionCallback onDuplicateConnectionCallback) {
         this.onDuplicateConnectionCallback = onDuplicateConnectionCallback;
+    }
+
+    public OnPushCallback getOnPushCallback() {
+        return mOnPushCallback;
+    }
+
+    /**
+     * 设置点击PUSH消息的回调函数
+     *
+     * @param
+     */
+    public void setOnPushCallback(OnPushCallback onPushCallback) {
+        this.mOnPushCallback = onPushCallback;
     }
 
     private String getProcessName(Context context) {
@@ -264,16 +306,36 @@ public class ChatClient {
         return null;
     }
 
-    private void setAPI(ChatAPIConfig config){
-        API.SIGNAL_URL = config.getSIGNAL_URL();
-        API.TOKEN = config.getTOKEN();
-        API.TURN_URL = config.getTURN_URL();
-        API.STUN_URL = config.getSTUN_URL();
-        API.TURN_ACCOUNT = config.getTURN_ACCOUNT();
-        API.TURN_PASSWORD = config.getTURN_PASSWORD();
-        API.UMENG_APPKEY = config.getUMENG_APPKEY();
-        API.UMENG_SECRET = config.getUMENG_SECRET();
-        API.XIAOMI_ID = config.getXIAOMI_ID();
-        API.XIAOMI_KEY = config.getXIAOMI_KEY();
+    private void setAPI(ChatAPIConfig config) {
+        API.SIGNAL_URL = config.getConfigParams().getSIGNAL_URL();
+        API.TOKEN = config.getConfigParams().getTOKEN();
+        API.TURN_URL = config.getConfigParams().getTURN_URL();
+        API.STUN_URL = config.getConfigParams().getSTUN_URL();
+        API.TURN_ACCOUNT = config.getConfigParams().getTURN_ACCOUNT();
+        API.TURN_PASSWORD = config.getConfigParams().getTURN_PASSWORD();
+        API.UMENG_APPKEY = config.getConfigParams().getUMENG_APPKEY();
+        API.UMENG_SECRET = config.getConfigParams().getUMENG_SECRET();
+        API.XIAOMI_ID = config.getConfigParams().getXIAOMI_ID();
+        API.XIAOMI_KEY = config.getConfigParams().getXIAOMI_KEY();
+        API.MEIZUAPP_ID = config.getConfigParams().getMEIZUAPP_ID();
+        API.MEIZUAPP_KEY = config.getConfigParams().getMEIZUAPP_KEY();
+        if (!TextUtils.isEmpty(API.STUN_URL)) {
+            iceServers.add(new PeerConnection.IceServer(API.STUN_URL));
+        }
+        if (!TextUtils.isEmpty(API.TURN_URL) && !TextUtils.isEmpty(API.TURN_ACCOUNT) && !TextUtils.isEmpty(API.TURN_PASSWORD)) {
+            iceServers.add(new PeerConnection.IceServer(API.TURN_URL, API.TURN_ACCOUNT, API.TURN_PASSWORD));
+        }
+    }
+
+    public void addStunUrl(String stunUrl) {
+        iceServers.add(new PeerConnection.IceServer(stunUrl));
+    }
+
+    public void addTurnUrl(String turnUrl, String turnAccount, String passWord) {
+        iceServers.add(new PeerConnection.IceServer(turnUrl, turnAccount, passWord));
+    }
+
+    public LinkedList<PeerConnection.IceServer> getIceServers() {
+        return iceServers;
     }
 }

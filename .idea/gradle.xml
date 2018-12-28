@@ -8,9 +8,10 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
-            <option value="$PROJECT_DIR$/platform" />
-            <option value="$PROJECT_DIR$/plugin" />
-            <option value="$PROJECT_DIR$/plugin/grid" />
+            <option value="$PROJECT_DIR$/audio_device_java" />
+            <option value="$PROJECT_DIR$/base_java" />
+            <option value="$PROJECT_DIR$/libjingle_peerconnection" />
+            <option value="$PROJECT_DIR$/simple" />
             <option value="$PROJECT_DIR$/webrtc-client" />
           </set>
         </option>

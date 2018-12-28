@@ -45,6 +45,10 @@ public class Constant {
         public static final String SIGNAL_MEMBER_LEAVED = "MEMBER_LEAVED";
         public static final String SIGNAL_DUPLICATE_CONNECTION = "DUPLICATE_CONNECTION";
         public static final String SIGNAL_PUSH = "PUSH";
+        public static final String SIGNAL_ADD = "ADD_OFFERED";
+        public static final String SIGNAL_ROOM_FULL = "ROOM_FULL";
+        public static final String SIGNAL_ADD_MEMBER_REFUSED = "ADD_MEMBER_REFUSED";
+        public static final String SIGNAL_CHANGE = "CHANGE";
 
     }
 
@@ -57,6 +61,10 @@ public class Constant {
         public static final String SIGNAL_Destination_LEAVE = "/signal/leave";
         public static final String SIGNAL_Destination_PONG = "/signal/pong";
         public static final String SIGNAL_Destination_PUSH = "/signal/push";
+        public static final String SIGNAL_Destination_ADD = "/signal/add";
+        public static final String SIGNAL_Destination_ADDANSWER = "/signal/addanswer";
+        public static final String SIGNAL_Destination_ADDREFUSE = "/signal/addrefuse";
+        public static final String SIGNAL_Destination_CHANGE = "/signal/change";
     }
 
     public static class SPCache {

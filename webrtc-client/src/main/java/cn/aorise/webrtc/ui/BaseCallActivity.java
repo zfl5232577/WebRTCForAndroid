@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.graphics.Point;
 import android.media.MediaPlayer;
 import android.media.RingtoneManager;
 import android.os.Build;
@@ -16,25 +17,28 @@ import android.os.Vibrator;
 import android.support.annotation.NonNull;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
+import android.text.TextUtils;
 import android.util.Log;
-import android.view.SurfaceHolder;
 import android.view.View;
 import android.view.WindowManager;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.webrtc.Camera1Enumerator;
+import org.webrtc.Camera2Enumerator;
 import org.webrtc.CameraEnumerationAndroid;
+import org.webrtc.CameraEnumerator;
+import org.webrtc.CameraVideoCapturer;
 import org.webrtc.DataChannel;
 import org.webrtc.EglBase;
 import org.webrtc.IceCandidate;
+import org.webrtc.Logging;
 import org.webrtc.MediaConstraints;
 import org.webrtc.MediaStream;
 import org.webrtc.PeerConnection;
 import org.webrtc.RendererCommon;
 import org.webrtc.SessionDescription;
 import org.webrtc.SurfaceViewRenderer;
-import org.webrtc.VideoCapturerAndroid;
-import org.webrtc.VideoRenderer;
 import org.webrtc.VideoTrack;
 
 import java.util.List;
@@ -42,6 +46,8 @@ import java.util.List;
 import cn.aorise.common.core.manager.ActivityManager;
 import cn.aorise.common.core.util.GsonUtils;
 import cn.aorise.common.core.util.SPUtils;
+import cn.aorise.common.core.util.ScreenUtils;
+import cn.aorise.common.core.util.SizeUtils;
 import cn.aorise.webrtc.R;
 import cn.aorise.webrtc.api.Constant;
 import cn.aorise.webrtc.chat.ChatClient;
@@ -49,9 +55,9 @@ import cn.aorise.webrtc.common.DialogUtil;
 import cn.aorise.webrtc.common.GridBaseActivity;
 import cn.aorise.webrtc.common.Mlog;
 import cn.aorise.webrtc.common.Utils;
-import cn.aorise.webrtc.provider.LifecycleEvent;
 import cn.aorise.webrtc.signal.SignalCallBack;
 import cn.aorise.webrtc.signal.SignalMessage;
+import cn.aorise.webrtc.stomp.LifecycleEvent;
 import cn.aorise.webrtc.stomp.StompMessage;
 import cn.aorise.webrtc.webrtc.PeerConnectionListener;
 import cn.aorise.webrtc.webrtc.PeerConnectionParameters;
@@ -63,10 +69,13 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
     private static final String TAG = BaseCallActivity.class.getSimpleName();
     private static final int CALL_TIME_OUT = 60000;//主叫超时
     private static final int CALLED_TIME_OUT = 55000;//被叫超时
+    private static final int CHECKING_TIME_OUT = 55000;//连接中超时
 
     public static final int TYPE_INVITING = 1;
     public static final int TYPE_CALLING = 2;
     public static final int TYPE_CALLED = 3;
+    public static final int TYPE_CHECKING = 4;
+
 
     private static final int SURFACE_LOCAL_X_CONNECTING = 0;
     private static final int SURFACE_LOCAL_Y_CONNECTING = 0;
@@ -88,9 +97,6 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
     private static final String MIN_VIDEO_WIDTH_CONSTRAINT = "minWidth";
     private static final String MAX_VIDEO_HEIGHT_CONSTRAINT = "maxHeight";
     private static final String MIN_VIDEO_HEIGHT_CONSTRAINT = "minHeight";
-
-    private static final int HD_VIDEO_WIDTH = 1280;
-    private static final int HD_VIDEO_HEIGHT = 720;
 
     private static final String VIDEO_CODEC_VP9 = "VP9";
     private static final String AUDIO_CODEC_OPUS = "opus";
@@ -116,7 +122,10 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
     protected String userName;
     protected String imgUrl;
     protected String name;
+    protected String extras;//扩展信息
+    protected int limit;//ADD时，房间人数限制
     protected int type;
+    protected long createtime;
     private String data;
 
     private boolean iceConnected = false;
@@ -132,10 +141,91 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
     private SignalCallBack signalCallBack;
     private PhoneBroadcastReceive mPhoneBroadcastReceive;
     private boolean isInited = false;
-    private VideoCapturerAndroid videoCapturer;
+    private CameraVideoCapturer videoCapturer;
     private boolean isNormal = true;
+    protected boolean isVideoCall = true;//视频通话或者语音通话
+    protected boolean isAdd;//是否是加入聊天室。false表示自己是房主
+    protected String signalMessageType;//
 
 
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        getWindow().addFlags(
+                WindowManager.LayoutParams.FLAG_FULLSCREEN
+                        | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                        | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+                        | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                        | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+        surfaceLocal = setSurfaceLocal();
+        surfaceRemote = setSurfaceRemote();
+        layoutLocalVideo = setLayoutLocalVideo();
+        layoutRemoteVideo = setLayoutRemoteVideo();
+        rootEglBase = EglBase.create();
+        if (isVideoCall) {
+            scalingType = RendererCommon.ScalingType.SCALE_ASPECT_FILL;
+            if (surfaceLocal != null) {
+                surfaceLocal.init(rootEglBase.getEglBaseContext(), null);
+                surfaceLocal.setZOrderMediaOverlay(true);
+            }
+            if (surfaceRemote != null) {
+                surfaceRemote.init(rootEglBase.getEglBaseContext(), null);
+            }
+        } else {
+            if (layoutLocalVideo != null) {
+                layoutLocalVideo.setVisibility(View.GONE);
+            }
+            if (layoutRemoteVideo != null) {
+                layoutRemoteVideo.setVisibility(View.GONE);
+            }
+        }
+        updateVideoView();
+        mRTCAudioManger = RTCAudioManger.getManager();
+        mRTCAudioManger.init(this.getApplicationContext());
+        if (ChatClient.getInstance().isConnected()) {
+            init();
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (mWebRtcClient != null && isVideoCall) {
+            mWebRtcClient.startVideoSource();
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (mWebRtcClient != null && isVideoCall) {
+            mWebRtcClient.stopVideoSource();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        ChatClient.getInstance().getSignalManager().removeConnectionListener(signalCallBack);
+        if (mPhoneBroadcastReceive != null) {
+            unregisterReceiver(mPhoneBroadcastReceive);
+            mPhoneBroadcastReceive = null;
+        }
+        if (mHandler != null) {
+            mHandler.removeCallbacksAndMessages(null);
+            mHandler = null;
+        }
+    }
+
+    /**
+     * @param context  上下文
+     * @param cls      呼叫页面的Activity类
+     * @param userName 用户名
+     * @param imgUrl   用户头像可为空
+     * @param name     用户昵称
+     * @param type     主动呼叫还是被叫（1主动呼叫，3被动接听）
+     * @return
+     */
     public static Intent getIntent(Context context, Class<? extends Activity> cls, String userName, String imgUrl, String name, int type) {
         Intent intent = new Intent(context, cls);
         intent.putExtra("userName", userName);
@@ -145,42 +235,46 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
         return intent;
     }
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        getWindow().setBackgroundDrawableResource(R.color.black);
-        getWindow().addFlags(
-                WindowManager.LayoutParams.FLAG_FULLSCREEN
-                        | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-                        | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
-                        | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
-                        | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
-        surfaceLocal = setSurfaceLocal();
-        if (surfaceLocal == null) {
-            surfaceLocal = new SurfaceViewRenderer(this);
-        }
-        surfaceRemote = setSurfaceRemote();
-        if (surfaceRemote == null) {
-            surfaceRemote = new SurfaceViewRenderer(this);
-        }
-        layoutLocalVideo = setLayoutLocalVideo();
-        if (layoutLocalVideo == null) {
-            layoutLocalVideo = new PercentFrameLayout(this);
-        }
-        layoutRemoteVideo = setLayoutRemoteVideo();
-        if (layoutRemoteVideo == null) {
-            layoutRemoteVideo = new PercentFrameLayout(this);
-        }
-        scalingType = RendererCommon.ScalingType.SCALE_ASPECT_FILL;
-        rootEglBase = EglBase.create();
-        surfaceLocal.init(rootEglBase.getEglBaseContext(), null);
-        surfaceRemote.init(rootEglBase.getEglBaseContext(), null);
-        surfaceLocal.setZOrderMediaOverlay(true);
-        updateVideoView();
-        setSignalCallBack();
-        if (ChatClient.getInstance().isConnected()) {
-            init();
-        }
+    public static Intent getIntent(Context context, Class<? extends Activity> cls, String userName, String imgUrl, String name, int type,
+                                   boolean isVideoCall, boolean isAdd, long createtime) {
+        Intent intent = getIntent(context, cls, userName, imgUrl, name, type);
+        intent.putExtra("isVideoCall", isVideoCall);
+        intent.putExtra("isAdd", isAdd);
+        intent.putExtra("createtime", createtime);
+        return intent;
+    }
+
+    public static Intent getIntent(Context context, Class<? extends Activity> cls, String userName, String imgUrl, String name, int type, boolean isVideoCall) {
+        Intent intent = getIntent(context, cls, userName, imgUrl, name, type);
+        intent.putExtra("isVideoCall", isVideoCall);
+        return intent;
+    }
+
+    public static Intent getIntent(Context context, Class<? extends Activity> cls, String userName, String imgUrl, String name, int type, boolean isVideoCall, boolean isAdd, long createtime, String extras) {
+        Intent intent = getIntent(context, cls, userName, imgUrl, name, type, isVideoCall, isAdd, createtime);
+        intent.putExtra("extras", extras);
+        return intent;
+    }
+
+    /**
+     * @param context     上下文
+     * @param cls         呼叫页面的Activity类
+     * @param userName    用户名
+     * @param imgUrl      用户头像可为空
+     * @param name        用户昵称
+     * @param type        主动呼叫还是被叫（1主动呼叫，3被动接听）
+     * @param isVideoCall 是否是视频，可以是语音
+     * @param isAdd       是否加入聊天室，假如多人室群聊，这里true,一对一传false
+     * @param createtime  创建的时间戳
+     * @param extras      自定义的Json数据串
+     * @param limit       聊天室默认人数限制，不传默认为9
+     * @return
+     */
+    public static Intent getIntent(Context context, Class<? extends Activity> cls, String userName, String imgUrl, String name, int type, boolean isVideoCall, boolean isAdd, long createtime, String extras, int limit) {
+        Intent intent = getIntent(context, cls, userName, imgUrl, name, type, isVideoCall, isAdd, createtime);
+        intent.putExtra("extras", extras);
+        intent.putExtra("limit", limit);
+        return intent;
     }
 
     protected void initData() {
@@ -189,18 +283,23 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
         imgUrl = intent.getStringExtra("imgUrl");
         type = intent.getIntExtra("type", TYPE_INVITING);
         name = intent.getStringExtra("name");
+        extras = intent.getStringExtra("extras");
+        isAdd = intent.getBooleanExtra("isAdd", false);
+        isVideoCall = intent.getBooleanExtra("isVideoCall", true);
+        createtime = intent.getLongExtra("createtime", 0);
+        limit = intent.getIntExtra("limit", 1);
         if (BaseCallActivity.TYPE_INVITING == type) {
             isInitiator = true;
             mRunnable = () -> {
-                sendSignal(Constant.SignalDestination.SIGNAL_Destination_REMOVE, "", "");
-                sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "", "");
+                sendSignal(Constant.SignalDestination.SIGNAL_Destination_REMOVE, "", Constant.SignalType.SIGNAL_REMOVED);
+                sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "", Constant.SignalType.SIGNAL_MEMBER_LEAVED);
                 disConnect();
             };
         } else {
             isInitiator = false;
             data = intent.getStringExtra("data");
             mRunnable = () -> {
-                sendSignal(Constant.SignalDestination.SIGNAL_Destination_REFUSE, "0", "");
+                sendSignal(Constant.SignalDestination.SIGNAL_Destination_REFUSE, "0", Constant.SignalType.SIGNAL_ADD_MEMBER_REFUSED);
                 disConnect();
             };
             mHandler.postDelayed(mRunnable, CALLED_TIME_OUT);
@@ -227,11 +326,11 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
             return;
         }
         isInited = true;
+        Log.e(TAG, "init: "+ScreenUtils.getScreenWidth()+ScreenUtils.getScreenHeight() );
         mPeerConnectionParameters = new PeerConnectionParameters(
-                true, false, HD_VIDEO_WIDTH, HD_VIDEO_HEIGHT, 30, 1, VIDEO_CODEC_VP9, true, 1, AUDIO_CODEC_OPUS, true);
+                isVideoCall, false, ScreenUtils.getScreenHeight(), ScreenUtils.getScreenWidth(), 30, 1, VIDEO_CODEC_VP9, true, 1, AUDIO_CODEC_OPUS, true);
         mWebRtcClient = new WebRtcClient(this.getApplicationContext(), rootEglBase.getEglBaseContext(), mPeerConnectionParameters, this);
-        mRTCAudioManger = RTCAudioManger.getManager();
-        mRTCAudioManger.init(this.getApplicationContext());
+        setSignalCallBack();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             List<String> unAuthPermissions = Utils.findUnAuthPermissions(this, MANDATORY_PERMISSIONS);
             if (unAuthPermissions.size() > 0) {
@@ -263,45 +362,60 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
             public void onMessage(StompMessage stompMessage) {
                 Log.e(TAG, "onMessage: " + stompMessage.getPayload());
                 SignalMessage signalMessage = GsonUtils.fromJson(stompMessage.getPayload(), SignalMessage.class);
-                String type = signalMessage.getType();
+                signalMessageType = signalMessage.getType();
 
-                if (Constant.SignalType.SIGNAL_MEMBER_REFUSED.equals(type)) {
-                    showToast(signalMessage.getData());
-                    sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "", "");
+                if (Constant.SignalType.SIGNAL_MEMBER_REFUSED.equals(signalMessageType)) {
+                    showLongToast(signalMessage.getData());
+                    sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "", Constant.SignalType.SIGNAL_MEMBER_LEAVED);
                     disConnect();
-                } else if (Constant.SignalType.SIGNAL_REFUSED.equals(type)) {
-                    showToast(signalMessage.getData());
-                    sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "", "");
+                } else if (Constant.SignalType.SIGNAL_REFUSED.equals(signalMessageType)) {
+                    showLongToast(signalMessage.getData());
+                    sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "", Constant.SignalType.SIGNAL_MEMBER_LEAVED);
                     disConnect();
-                } else if (Constant.SignalType.SIGNAL_ANSWERED.equals(type)) {
+                } else if (Constant.SignalType.SIGNAL_ANSWERED.equals(signalMessageType)) {
                     mHandler.removeCallbacksAndMessages(null);
                     mWebRtcClient.setRemoteDescription(parseSdp(signalMessage.getData()));
-                } else if (Constant.SignalType.SIGNAL_REMOVED.equals(type)) {
-                    String data = signalMessage.getData();
-                    showToast(data);
+                } else if (Constant.SignalType.SIGNAL_CHANGE.equals(signalMessageType)) {
+                    if (isVideoCall) {
+                        showLongToast("对方已切换至语音通话");
+                        convertToSpeech();
+                        updateCallView();
+                    }
+                } else if (Constant.SignalType.SIGNAL_ROOM_FULL.equals(signalMessageType)) {
+                    showLongToast(signalMessage.getData());
+                    sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "", Constant.SignalType.SIGNAL_MEMBER_LEAVED);
                     disConnect();
-                } else if (Constant.SignalType.SIGNAL_ROOM_DISSOLVED.equals(type)) {
-                    String data = signalMessage.getData();
-                    showToast(data);
+                } else if (Constant.SignalType.SIGNAL_ADD_MEMBER_REFUSED.equals(signalMessageType)) {
+                    showLongToast(signalMessage.getData());
+                    sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "", Constant.SignalType.SIGNAL_MEMBER_LEAVED);
                     disConnect();
-                } else if (Constant.SignalType.SIGNAL_MEMBER_LEAVED.equals(type)) {
+                } else if (Constant.SignalType.SIGNAL_REMOVED.equals(signalMessageType)) {
                     String data = signalMessage.getData();
-                    showToast(data);
-                    sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "", "");
+                    showLongToast(data);
                     disConnect();
-                } else if (Constant.SignalType.SIGNAL_CANDIDATE.equals(type)) {
+                } else if (Constant.SignalType.SIGNAL_ROOM_DISSOLVED.equals(signalMessageType)) {
+                    String data = signalMessage.getData();
+                    showLongToast(data);
+                    disConnect();
+                } else if (Constant.SignalType.SIGNAL_MEMBER_LEAVED.equals(signalMessageType)) {
+                    String data = signalMessage.getData();
+                    showLongToast(data);
+                    sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "", Constant.SignalType.SIGNAL_MEMBER_LEAVED);
+                    disConnect();
+                } else if (Constant.SignalType.SIGNAL_CANDIDATE.equals(signalMessageType)) {
+                    Log.e(TAG, "onMessage: " + Thread.currentThread().getName());
                     mWebRtcClient.addRemoteIceCandidate(parseIceCandidate(signalMessage.getData()));
                 } else if (Constant.SignalType.SIGNAL_PUSH.equals(signalMessage.getType())) {
                     if ("1".equals(signalMessage.getData())) {
                         //推送成功
-                        showToast("对方不在线，已通知对方！");
+                        showLongToast("对方不在线，已通知对方！");
                         disConnect();
                     } else {
                         //推送失败
-                        showToast("对方不在线，请稍后再试！");
+                        showLongToast("对方不在线，请稍后再试！");
                         disConnect();
                     }
-                } else if (Constant.SignalType.SIGNAL_DUPLICATE_CONNECTION.equals(type)) {
+                } else if (Constant.SignalType.SIGNAL_DUPLICATE_CONNECTION.equals(signalMessageType)) {
                     DialogUtil.showDialog(BaseCallActivity.this, getString(R.string.grid_dialog_conflict_login_title),
                             getString(R.string.grid_dialog_conflict_login_content), getString(R.string.grid_dialog_conflict_login_exit),
                             getString(R.string.grid_dialog_conflict_login_again), R.color.grid_txt_default, R.color.grid_txt_dialog_right,
@@ -312,8 +426,7 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
                                     DialogUtil.dismissDialog();
                                     ActivityManager.getInstance().appExit(BaseCallActivity.this);
                                 } else if (v.getId() == R.id.tv_dialog_right) {
-                                    Constant.LoginInfo.isLogin = true;
-                                    ChatClient.getInstance().getSignalManager().reconnect();
+                                    ChatClient.getInstance().getSignalManager().reconnect(true);
                                     DialogUtil.dismissDialog();
                                     finish();
                                 }
@@ -345,23 +458,42 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
     }
 
     private void updateVideoView() {
-        layoutRemoteVideo.setPosition(SURFACE_REMOTE_X, SURFACE_REMOTE_Y, SURFACE_REMOTE_WIDTH, SURFACE_REMOTE_HEIGHT);
-        surfaceRemote.setScalingType(scalingType);
-        surfaceRemote.setMirror(false);
-
-        if (iceConnected) {
-            layoutLocalVideo.setPosition(
-                    SURFACE_LOCAL_X_CONNECTED, SURFACE_LOCAL_Y_CONNECTED, SURFACE_LOCAL_WIDTH_CONNECTED, SURFACE_LOCAL_HEIGHT_CONNECTED);
-            surfaceLocal.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
-        } else {
-            layoutLocalVideo.setPosition(
-                    SURFACE_LOCAL_X_CONNECTING, SURFACE_LOCAL_Y_CONNECTING, SURFACE_LOCAL_WIDTH_CONNECTING, SURFACE_LOCAL_HEIGHT_CONNECTING);
-            surfaceLocal.setScalingType(scalingType);
+        if (!isVideoCall) {//语音通话直接返回
+            return;
         }
-
-        surfaceLocal.setMirror(true);
-        surfaceLocal.requestLayout();
-        surfaceRemote.requestLayout();
+        if (layoutRemoteVideo != null && surfaceRemote != null) {//设置远程画面窗口
+            if (iceConnected) {
+                layoutRemoteVideo.setVisibility(View.VISIBLE);
+                layoutRemoteVideo.setPosition(SURFACE_REMOTE_X, SURFACE_REMOTE_Y, SURFACE_REMOTE_WIDTH, SURFACE_REMOTE_HEIGHT);
+                surfaceRemote.setScalingType(scalingType);
+                surfaceRemote.setMirror(false);
+                surfaceRemote.requestLayout();
+            } else {//连接之前先隐藏
+                layoutRemoteVideo.setVisibility(View.GONE);
+            }
+        }
+        if (layoutLocalVideo != null && surfaceLocal != null) {
+            if (iceConnected) {
+                layoutLocalVideo.setVisibility(View.VISIBLE);
+                if (layoutRemoteVideo != null && surfaceRemote != null) {//同时存在远程画面，缩小本地画面
+                    layoutLocalVideo.setVisibility(View.VISIBLE);
+                    layoutLocalVideo.setPosition(
+                            SURFACE_LOCAL_X_CONNECTED, SURFACE_LOCAL_Y_CONNECTED, SURFACE_LOCAL_WIDTH_CONNECTED, SURFACE_LOCAL_HEIGHT_CONNECTED);
+                    surfaceLocal.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
+                    surfaceLocal.setMirror(true);
+                    surfaceLocal.requestLayout();
+                }
+            } else {//连接之前，主叫的话显示本地画面
+                layoutLocalVideo.setPosition(
+                        SURFACE_LOCAL_X_CONNECTING, SURFACE_LOCAL_Y_CONNECTING, SURFACE_LOCAL_WIDTH_CONNECTING, SURFACE_LOCAL_HEIGHT_CONNECTING);
+                surfaceLocal.setScalingType(scalingType);
+                surfaceLocal.setMirror(true);
+                surfaceLocal.requestLayout();
+                if (!isInitiator) {//连接之前，被叫的话就隐藏
+                    layoutLocalVideo.setVisibility(View.GONE);
+                }
+            }
+        }
     }
 
     @Override
@@ -410,7 +542,7 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
      * 切换摄像头
      */
     protected void switchCamera() {
-        videoCapturer.switchCamera(new VideoCapturerAndroid.CameraSwitchHandler() {
+        videoCapturer.switchCamera(new CameraVideoCapturer.CameraSwitchHandler() {
             @Override
             public void onCameraSwitchDone(final boolean b) {
 
@@ -427,11 +559,35 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
      * 接听视频
      */
     protected void answer() {
+        type = TYPE_CHECKING;
         releaseMediaPlayer();
         setmLocalStream();
         mWebRtcClient.setRemoteDescription(parseSdp(data));
         mWebRtcClient.createAnswerSdp();
         mHandler.removeCallbacksAndMessages(null);
+        //假如一直在连接中，15秒后自动断开
+        mRunnable = () -> {
+            if (!DialogUtil.isShow()) {
+                showLongToast(getString(R.string.grid_call_disconnect));
+                sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "网络波动断开连接", Constant.SignalType.SIGNAL_MEMBER_LEAVED);
+                disConnect();
+            }
+        };
+        mHandler.postDelayed(mRunnable, CHECKING_TIME_OUT);
+    }
+
+    protected void answer(boolean isVideoCall) {
+        this.isVideoCall = isVideoCall;
+        answer();
+        if (!isVideoCall) {
+            if (layoutLocalVideo != null) {
+                layoutLocalVideo.setVisibility(View.GONE);
+            }
+            if (layoutRemoteVideo != null) {
+                layoutRemoteVideo.setVisibility(View.GONE);
+            }
+            sendSignal(Constant.SignalDestination.SIGNAL_Destination_CHANGE, "", Constant.SignalType.SIGNAL_CHANGE);
+        }
     }
 
     /**
@@ -439,13 +595,23 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
      */
     protected void hangupOrRefuse() {
         if (isInitiator) {
-            sendSignal(Constant.SignalDestination.SIGNAL_Destination_REMOVE, "", "");
-            sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "", "");
+            if (isAdd) {
+                sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "", Constant.SignalType.SIGNAL_MEMBER_LEAVED);
+            } else {
+                sendSignal(Constant.SignalDestination.SIGNAL_Destination_REMOVE, "", Constant.SignalType.SIGNAL_REMOVED);
+                sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "", Constant.SignalType.SIGNAL_MEMBER_LEAVED);
+            }
         } else {
             if (type == TYPE_CALLED) {
-                sendSignal(Constant.SignalDestination.SIGNAL_Destination_REFUSE, "1", Constant.SignalType.SIGNAL_MEMBER_REFUSED);
+                if (isAdd) {
+                    sendSignal(Constant.SignalDestination.SIGNAL_Destination_ADDREFUSE, "1", Constant.SignalType.SIGNAL_ADD_MEMBER_REFUSED);
+                } else {
+                    sendSignal(Constant.SignalDestination.SIGNAL_Destination_REFUSE, "1", Constant.SignalType.SIGNAL_MEMBER_REFUSED);
+                }
             } else if (type == TYPE_CALLING) {
-                sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "", "");
+                sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "", Constant.SignalType.SIGNAL_MEMBER_LEAVED);
+            } else if (type == TYPE_CHECKING) {
+                sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "", Constant.SignalType.SIGNAL_MEMBER_LEAVED);
             }
         }
         disConnect();
@@ -465,7 +631,7 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
                 updateCallView();
                 break;
             case RTCAudioManger.MODE_HEADSET:
-                showToast(getString(R.string.grid_call_audio_mode_headset_insert));
+                showLongToast(getString(R.string.grid_call_audio_mode_headset_insert));
                 break;
         }
     }
@@ -475,6 +641,12 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
      * 切换视频画面
      */
     protected void switchVideo() {
+        if (!isVideoCall || layoutRemoteVideo == null
+                || layoutLocalVideo == null
+                || surfaceRemote == null
+                || surfaceLocal == null) {
+            return;
+        }
         if (isNormal) {
             isNormal = false;
             layoutRemoteVideo.setPosition(
@@ -504,14 +676,16 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
      * 语音/视频互相转换
      */
     protected void convertToSpeech() {
-        if (mWebRtcClient.isVideoSourceStopped()) {
-            layoutLocalVideo.setVisibility(View.VISIBLE);
-            layoutRemoteVideo.setVisibility(View.VISIBLE);
-            mWebRtcClient.startVideoSource();
-        } else {
-            layoutLocalVideo.setVisibility(View.GONE);
-            layoutRemoteVideo.setVisibility(View.GONE);
+        if (isVideoCall) {
+            isVideoCall = false;
             mWebRtcClient.stopVideoSource();
+            if (layoutLocalVideo != null) {
+                layoutLocalVideo.setVisibility(View.GONE);
+            }
+            if (layoutRemoteVideo != null) {
+                layoutRemoteVideo.setVisibility(View.GONE);
+            }
+            sendSignal(Constant.SignalDestination.SIGNAL_Destination_CHANGE, "", Constant.SignalType.SIGNAL_CHANGE);
         }
     }
 
@@ -520,6 +694,9 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
     }
 
     private void playCallRing() {
+        if (mRTCAudioManger != null) {
+            mRTCAudioManger.changeToRingtoneMode();
+        }
         mMediaPlayer = MediaPlayer.create(this, Utils.getSystemDefultRingtoneUri(this));
         if (mMediaPlayer == null) {
             mMediaPlayer = MediaPlayer.create(this, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE));
@@ -563,14 +740,20 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
                 getLocalCandidate();
                 mWebRtcClient.drainCandidate();
             } else {
-                sendSignal(Constant.SignalDestination.SIGNAL_Destination_OFFERE, Sdp2data(localSdp), "");
+                if (isAdd) {
+                    sendSignal(Constant.SignalDestination.SIGNAL_Destination_ADD, Sdp2data(localSdp), Constant.SignalType.SIGNAL_ADD);
+                } else {
+                    sendSignal(Constant.SignalDestination.SIGNAL_Destination_OFFERE, Sdp2data(localSdp), Constant.SignalType.SIGNAL_OFFERED);
+                }
                 mHandler.postDelayed(mRunnable, CALL_TIME_OUT);
             }
         } else {
-            if (mWebRtcClient.getmPeerConnection().getLocalDescription() != null) {
+            if (isAdd) {
+                sendSignal(Constant.SignalDestination.SIGNAL_Destination_ADDANSWER, Sdp2data(localSdp), Constant.SignalType.SIGNAL_ANSWERED);
+            } else {
                 sendSignal(Constant.SignalDestination.SIGNAL_Destination_ANSWER, Sdp2data(localSdp), Constant.SignalType.SIGNAL_ANSWERED);
-                mWebRtcClient.drainCandidate();
             }
+            mWebRtcClient.drainCandidate();
         }
 
     }
@@ -592,8 +775,9 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
 
     @Override
     public void onIceConnectionChange(PeerConnection.IceConnectionState iceConnectionState) {
-        Mlog.e(TAG, "onIceConnectionChange: ");
+        Mlog.e(TAG, "onIceConnectionChange: " + iceConnectionState);
         if (iceConnectionState == PeerConnection.IceConnectionState.CONNECTED) {
+            mHandler.removeCallbacksAndMessages(null);
             isCalling = true;
             type = TYPE_CALLING;
             iceConnected = true;
@@ -606,14 +790,16 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
             });
         } else if (iceConnectionState == PeerConnection.IceConnectionState.DISCONNECTED || iceConnectionState == PeerConnection.IceConnectionState.FAILED) {
             iceConnected = false;
+            mHandler.removeCallbacksAndMessages(null);
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
                     if (!DialogUtil.isShow()) {
-                        showToast(getString(R.string.grid_call_disconnect));
-                        if (isInitiator) {
-                            sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "", "");
+                        showLongToast(getString(R.string.grid_call_disconnect));
+                        if (isInitiator && !isAdd) {
+                            sendSignal(Constant.SignalDestination.SIGNAL_Destination_REMOVE, "", Constant.SignalType.SIGNAL_REMOVED);
                         }
+                        sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "网络波动断开连接", Constant.SignalType.SIGNAL_MEMBER_LEAVED);
                         disConnect();
                     }
                 }
@@ -643,6 +829,9 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
 
     @Override
     public void onAddStream(MediaStream mediaStream) {
+        if (surfaceRemote == null) {
+            return;
+        }
         Mlog.e(TAG, "onAddStream: ");
         if (mWebRtcClient.getmPeerConnection() == null) {
             return;
@@ -653,7 +842,7 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
         if (mediaStream.videoTracks.size() == 1) {
             remoteVideoTrack = mediaStream.videoTracks.get(0);
             remoteVideoTrack.setEnabled(true);
-            remoteVideoTrack.addRenderer(new VideoRenderer(surfaceRemote));
+            remoteVideoTrack.addSink(surfaceRemote);
         }
     }
 
@@ -674,25 +863,29 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
     }
 
     private void setmLocalStream() {
+        mRTCAudioManger.changeToCallMode();
         if (mWebRtcClient != null) {
             mLocalStream = mWebRtcClient.createLocalStream();
             if (mLocalStream != null) {
+                if (isVideoCall) {
+                    MediaConstraints videoConstraints = new MediaConstraints();
+                    if (mPeerConnectionParameters.videoCallEnabled) {
+                        videoConstraints.mandatory.add(new MediaConstraints.KeyValuePair(MIN_VIDEO_WIDTH_CONSTRAINT, "640"));
+                        videoConstraints.mandatory.add(new MediaConstraints.KeyValuePair(MAX_VIDEO_WIDTH_CONSTRAINT, Integer.toString(mPeerConnectionParameters.videoWidth)));
+                        videoConstraints.mandatory.add(new MediaConstraints.KeyValuePair(MIN_VIDEO_HEIGHT_CONSTRAINT, "480"));
+                        videoConstraints.mandatory.add(new MediaConstraints.KeyValuePair(MAX_VIDEO_HEIGHT_CONSTRAINT, Integer.toString(mPeerConnectionParameters.videoHeight)));
+                        videoConstraints.mandatory.add(new MediaConstraints.KeyValuePair("maxFrameRate", Integer.toString(mPeerConnectionParameters.videoFps)));
+                    }
+                    videoCapturer = getVideoCapturer();
+                    localVideoTrack = mWebRtcClient.createVideoTrack(mWebRtcClient.createVideoSource(videoCapturer, videoConstraints));
+                    if (surfaceLocal != null) {
+                        localVideoTrack.addSink(surfaceLocal);
+                    }
+                    mLocalStream.addTrack(localVideoTrack);
+                }
                 MediaConstraints audioConstraints = new MediaConstraints();
-                MediaConstraints videoConstraints = new MediaConstraints();
-//                if (mPeerConnectionParameters.videoCodecHwAcceleration) {
-//                    videoConstraints.mandatory.add(new MediaConstraints.KeyValuePair(MIN_VIDEO_WIDTH_CONSTRAINT, "640"));
-//                    videoConstraints.mandatory.add(new MediaConstraints.KeyValuePair(MAX_VIDEO_WIDTH_CONSTRAINT, "1920"));
-//                    videoConstraints.mandatory.add(new MediaConstraints.KeyValuePair(MIN_VIDEO_HEIGHT_CONSTRAINT, "480"));
-//                    videoConstraints.mandatory.add(new MediaConstraints.KeyValuePair(MAX_VIDEO_HEIGHT_CONSTRAINT, "1080"));
-//                }
-                videoCapturer = getVideoCapturer();
-                localVideoTrack = mWebRtcClient.createVideoTrack(mWebRtcClient.createVideoSource(videoCapturer, videoConstraints));
-                localVideoTrack.addRenderer(new VideoRenderer(surfaceLocal));
-                mLocalStream.addTrack(localVideoTrack);
                 mLocalStream.addTrack(mWebRtcClient.createAudioTrack(audioConstraints));
-
                 mWebRtcClient.setLocalStream(mLocalStream);
-
                 if (BaseCallActivity.TYPE_INVITING == type) {
                     invite();
                 }
@@ -701,14 +894,42 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
     }
 
 
-    private VideoCapturerAndroid getVideoCapturer() {
-        String cameraDeviceName = CameraEnumerationAndroid.getDeviceName(0);
-        String frontCameraDeviceName =
-                CameraEnumerationAndroid.getNameOfFrontFacingDevice();
-        if (frontCameraDeviceName != null) {
-            cameraDeviceName = frontCameraDeviceName;
+    private CameraVideoCapturer getVideoCapturer() {
+        CameraEnumerator enumerator;
+        if (Camera2Enumerator.isSupported(this)){
+            enumerator = new Camera2Enumerator(this);
+        }else {
+            enumerator = new Camera1Enumerator(false);
         }
-        return VideoCapturerAndroid.create(cameraDeviceName, null, rootEglBase.getEglBaseContext());
+        final String[] deviceNames = enumerator.getDeviceNames();
+
+        // First, try to find front facing camera
+        Logging.d(TAG, "Looking for front facing cameras.");
+        for (String deviceName : deviceNames) {
+            if (enumerator.isFrontFacing(deviceName)) {
+                Logging.d(TAG, "Creating front facing camera capturer.");
+                CameraVideoCapturer videoCapturer = enumerator.createCapturer(deviceName, null);
+
+                if (videoCapturer != null) {
+                    return videoCapturer;
+                }
+            }
+        }
+
+        // Front facing camera not found, try something else
+        Logging.d(TAG, "Looking for other cameras.");
+        for (String deviceName : deviceNames) {
+            if (!enumerator.isFrontFacing(deviceName)) {
+                Logging.d(TAG, "Creating other camera capturer.");
+                CameraVideoCapturer videoCapturer = enumerator.createCapturer(deviceName, null);
+
+                if (videoCapturer != null) {
+                    return videoCapturer;
+                }
+            }
+        }
+
+        return null;
     }
 
     private void getLocalCandidate() {
@@ -726,40 +947,18 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
     private void sendSignal(String destination, String data, String type) {
         if (ChatClient.getInstance().isConnected() && mWebRtcClient != null) {
             if (Constant.LoginInfo.isLogin && Constant.LoginInfo.user != null) {
-                SignalMessage signalMessage = new SignalMessage(Constant.LoginInfo.user.getUserName(), userName, data, type, Constant.LoginInfo.user.getNickName(), Constant.LoginInfo.user.getUserIcon());
-                mWebRtcClient.sendSignal(destination, GsonUtils.toJson(signalMessage));
+                SignalMessage signalMessage = new SignalMessage(Constant.LoginInfo.user.getUserName(), userName, data, type, Constant.LoginInfo.user.getNickName(), Constant.LoginInfo.user.getUserIcon(), !isVideoCall);
+                signalMessage.setLimit(limit);
+                if (!TextUtils.isEmpty(extras)) {
+                    signalMessage.setExtras(extras);
+                }
+                ChatClient.getInstance().getSignalManager().send(destination, GsonUtils.toJson(signalMessage));
             }
         }
     }
 
     @Override
     public void onBackPressed() {
-    }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        if (mWebRtcClient != null) {
-            mWebRtcClient.stopVideoSource();
-        }
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        if (mWebRtcClient != null) {
-            mWebRtcClient.startVideoSource();
-        }
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (mPhoneBroadcastReceive != null) {
-            unregisterReceiver(mPhoneBroadcastReceive);
-            mPhoneBroadcastReceive = null;
-        }
-
     }
 
     private void releaseMediaPlayer() {
@@ -782,14 +981,12 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
 
     private void disConnect() {
         Log.e(TAG, "disConnect: ========================================");
-        ChatClient.getInstance().getSignalManager().removeConnectionListener(signalCallBack);
         releaseMediaPlayer();
-        if (mHandler != null) {
-            mHandler.removeCallbacksAndMessages(null);
+        if (signalCallBack != null) {
+            ChatClient.getInstance().getSignalManager().removeConnectionListener(signalCallBack);
+            signalCallBack = null;
         }
-
         if (mRTCAudioManger != null) {
-            mRTCAudioManger.changeToSpeakerMode();
             mRTCAudioManger.close();
             mRTCAudioManger = null;
         }
@@ -912,7 +1109,7 @@ public abstract class BaseCallActivity extends GridBaseActivity implements PeerC
 
                                     break;
                                 case TelephonyManager.CALL_STATE_OFFHOOK:
-                                    sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "", "");
+                                    sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "", Constant.SignalType.SIGNAL_MEMBER_LEAVED);
                                     disConnect();
                                     break;
                                 case TelephonyManager.CALL_STATE_RINGING:

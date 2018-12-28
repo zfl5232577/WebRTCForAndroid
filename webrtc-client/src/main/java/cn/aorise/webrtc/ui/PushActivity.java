@@ -35,9 +35,18 @@ public class PushActivity extends UmengNotifyClickActivity {
         Log.i(TAG, body);
         PushMessageBean bean = GsonUtils.fromJson(body, PushMessageBean.class);
         if (bean != null && bean.getExtra() != null) {
-            Intent intent1 = BaseCallActivity.getIntent(getApplicationContext(), ChatClient.getInstance().getCallActivity(),bean.getExtra().getUsername(), bean.getExtra().getImgurl(), bean.getExtra().getName(), BaseCallActivity.TYPE_INVITING);
-            intent1.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(intent1);
+            if (ChatClient.getInstance().getOnPushCallback() == null) {
+                Intent intent1 = BaseCallActivity.getIntent(getApplicationContext(),
+                        ChatClient.getInstance().getCallActivity(),
+                        bean.getExtra().getUsername(), bean.getExtra().getImgurl(),
+                        bean.getExtra().getName(), BaseCallActivity.TYPE_INVITING,
+                        true, !bean.getExtra().isAudioFlag(),
+                        bean.getExtra().getCreateTime(),bean.getExtra().getExtras());
+                intent1.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent1);
+            } else {
+                ChatClient.getInstance().getOnPushCallback().handPushMessage(bean);
+            }
         }
         finish();
     }
@@ -46,7 +55,7 @@ public class PushActivity extends UmengNotifyClickActivity {
 
         /**
          * display_type : notification
-         * extra : {"imgurl":"imgurl","name":"name","username":"username"}
+         * extra : {"imgurl":"imgurl","name":"name","username":"username","createtime":132321321312,"extras":"{}"}
          * msg_id : umerfub152403662362410
          * body : {"after_open":"go_app","play_lights":"false","ticker":"离线1530","play_vibrate":"false","text":"离线1530离线1530离线1530离线1530离线1530离线1530","title":"离线1530","play_sound":"true"}
          * random_min : 0
@@ -108,6 +117,33 @@ public class PushActivity extends UmengNotifyClickActivity {
             private String imgurl;
             private String name;
             private String username;
+            private boolean audioFlag;
+            private long createTime;
+            private String extras;
+
+            public String getExtras() {
+                return extras;
+            }
+
+            public void setExtras(String extras) {
+                this.extras = extras;
+            }
+
+            public boolean isAudioFlag() {
+                return audioFlag;
+            }
+
+            public void setAudioFlag(boolean audioFlag) {
+                this.audioFlag = audioFlag;
+            }
+
+            public long getCreateTime() {
+                return createTime;
+            }
+
+            public void setCreateTime(long createTime) {
+                this.createTime = createTime;
+            }
 
             public String getImgurl() {
                 return imgurl;

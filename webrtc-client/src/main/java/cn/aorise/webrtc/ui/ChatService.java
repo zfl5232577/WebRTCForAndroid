@@ -2,6 +2,8 @@ package cn.aorise.webrtc.ui;
 
 import android.annotation.SuppressLint;
 import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -28,15 +30,29 @@ public class ChatService extends Service {
     @SuppressLint("WrongConstant")
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
-            foregroundService();
-        }
-        registerProtectBroadcast();
+        foregroundService();
+//        registerProtectBroadcast();
         return START_STICKY;
     }
 
     private void foregroundService() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN) {
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationManager notificationManager =
+                    (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            if (notificationManager != null) {
+                NotificationChannel channel = new NotificationChannel(String.valueOf(0x999), "ChatService", NotificationManager.IMPORTANCE_HIGH);
+                notificationManager.createNotificationChannel(channel);
+                Notification.Builder builder = new Notification.Builder(this, String.valueOf(0x999));
+                builder.setOngoing(true);
+                builder.setSmallIcon(getApplicationContext().getApplicationInfo().icon);
+                builder.setTicker("Foreground Service Start");
+                builder.setContentTitle(getString(getApplicationContext().getApplicationInfo().labelRes) + "被叫服务");
+                builder.setContentText("保证视频呼叫顺畅，请勿关闭应用");
+                Notification notification = builder.build();
+                startForeground(0x999, notification);
+            }
+        } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN) {
             InnerService.startForeground(this);
             startService(new Intent(this, InnerService.class));
         } else {
@@ -72,10 +88,10 @@ public class ChatService extends Service {
             }
             switch (action) {
                 case Intent.ACTION_SCREEN_ON:
-                    ActivityManager.getInstance().findActivity(DaemonActivity.class);
+//                    ActivityManager.getInstance().findActivity(DaemonActivity.class);
                     break;
                 case Intent.ACTION_SCREEN_OFF:
-                    DaemonActivity.startActivity(context);
+//                    DaemonActivity.startActivity(context);
                     break;
             }
 
@@ -131,7 +147,7 @@ public class ChatService extends Service {
             builder.setContentTitle(context.getString(context.getApplicationContext().getApplicationInfo().labelRes) + "被叫服务");
             builder.setContentText("保证视频呼叫顺畅，请勿关闭应用");
             Notification notification = builder.build();
-            context.startForeground(0x999,notification);
+            context.startForeground(0x999, notification);
         }
     }
 }

@@ -15,4 +15,6 @@ public class API {
     public static String UMENG_SECRET;
     public static String XIAOMI_ID;
     public static String XIAOMI_KEY;
+    public static String MEIZUAPP_ID;
+    public static String MEIZUAPP_KEY;
 }

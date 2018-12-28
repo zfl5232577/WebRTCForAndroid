@@ -1,9 +1,13 @@
 package cn.aorise.webrtc.webrtc;
 
 import android.content.Context;
+import android.os.Environment;
+import android.util.Log;
 
 import org.webrtc.AudioSource;
 import org.webrtc.AudioTrack;
+import org.webrtc.DefaultVideoDecoderFactory;
+import org.webrtc.DefaultVideoEncoderFactory;
 import org.webrtc.EglBase;
 import org.webrtc.IceCandidate;
 import org.webrtc.MediaConstraints;
@@ -11,15 +15,19 @@ import org.webrtc.MediaStream;
 import org.webrtc.PeerConnection;
 import org.webrtc.PeerConnectionFactory;
 import org.webrtc.SessionDescription;
+import org.webrtc.SoftwareVideoDecoderFactory;
+import org.webrtc.SoftwareVideoEncoderFactory;
 import org.webrtc.VideoCapturer;
+import org.webrtc.VideoDecoderFactory;
+import org.webrtc.VideoEncoderFactory;
 import org.webrtc.VideoSource;
 import org.webrtc.VideoTrack;
+import org.webrtc.audio.AudioDeviceModule;
 
+import java.io.File;
 import java.util.LinkedList;
 
-import cn.aorise.webrtc.api.API;
-import cn.aorise.webrtc.api.Constant;
-import cn.aorise.webrtc.stomp.StompClient;
+import cn.aorise.webrtc.chat.ChatClient;
 
 /**
  * Created by 54926 on 2017/8/30.
@@ -49,11 +57,17 @@ public class WebRtcClient {
         mParameters = peerConnectionParameters;
         //PeerConnectionFactory.initializeInternalTracer();
         // Initialize field trials
-        // PeerConnectionFactory.initializeFieldTrials(FIELD_TRIAL_AUTOMATIC_RESIZE);
-        PeerConnectionFactory.initializeAndroidGlobals(context, true, true,
-                peerConnectionParameters.videoCodecHwAcceleration);
+//         PeerConnectionFactory.initializeFieldTrials(FIELD_TRIAL_AUTOMATIC_RESIZE);
+        PeerConnectionFactory.initialize(
+                PeerConnectionFactory.InitializationOptions.builder(context)
+//                .setFieldTrials(fieldTrials)
+                .setEnableInternalTracer(true)
+                .createInitializationOptions());
         options = new PeerConnectionFactory.Options();
-        mPeerConnectionFactory = new PeerConnectionFactory(options);
+        mPeerConnectionFactory = PeerConnectionFactory.builder()
+                .setOptions(options)
+                .createPeerConnectionFactory();
+
         mConstraints.optional.add(
                 new MediaConstraints.KeyValuePair(DTLS_SRTP_KEY_AGREEMENT_CONSTRAINT, "true"));
 
@@ -66,10 +80,15 @@ public class WebRtcClient {
         queuedLocalCandidates = new LinkedList<>();
     }
 
+
     public void addRemoteIceCandidate(IceCandidate candidate) {
         if (mPeerConnection != null) {
             if (queuedRemoteCandidates != null) {
-                queuedRemoteCandidates.add(candidate);
+                synchronized (queuedRemoteCandidates) {
+                    if (queuedRemoteCandidates != null) {
+                        queuedRemoteCandidates.add(candidate);
+                    }
+                }
             } else {
                 mPeerConnection.addIceCandidate(candidate);
             }
@@ -87,9 +106,22 @@ public class WebRtcClient {
     }
 
     public void createPeerConnection(EglBase.Context renderEGLContext) {
-        mPeerConnectionFactory.setVideoHwAccelerationOptions(renderEGLContext, renderEGLContext);
-        iceServers.add(new PeerConnection.IceServer(API.STUN_URL));
-        iceServers.add(new PeerConnection.IceServer(API.TURN_URL, API.TURN_ACCOUNT, API.TURN_PASSWORD));
+        iceServers.addAll(ChatClient.getInstance().getIceServers());
+//        iceServers.add(new PeerConnection.IceServer("stun:stun.l.google.com:19302"));
+//        iceServers.add(new PeerConnection.IceServer("stun:stun01.sipphone.com"));
+//        iceServers.add(new PeerConnection.IceServer("stun:stun.ekiga.net"));
+//        iceServers.add(new PeerConnection.IceServer("stun:stun.fwdnet.net"));
+//        iceServers.add(new PeerConnection.IceServer("stun:stun.ideasip.com"));
+//        iceServers.add(new PeerConnection.IceServer("stun:stun.iptel.org"));
+//        iceServers.add(new PeerConnection.IceServer("stun:stun.rixtelecom.se"));
+//        iceServers.add(new PeerConnection.IceServer("stun:stun.schlund.de"));
+//        iceServers.add(new PeerConnection.IceServer("stun:stunserver.org"));
+//        iceServers.add(new PeerConnection.IceServer("stun:stun.softjoys.com"));
+//        iceServers.add(new PeerConnection.IceServer("stun:stun.voiparound.com"));
+//        iceServers.add(new PeerConnection.IceServer("stun:stun.voipbuster.com"));
+//        iceServers.add(new PeerConnection.IceServer("stun:stun.voipstunt.com"));
+//        iceServers.add(new PeerConnection.IceServer("stun:stun.voxgratia.org"));
+//        iceServers.add(new PeerConnection.IceServer("stun:stun.xten.com"));
         PeerConnection.RTCConfiguration rtcConfig =
                 new PeerConnection.RTCConfiguration(iceServers);
         // TCP candidates are only useful when connecting to a server that supports
@@ -100,7 +132,7 @@ public class WebRtcClient {
         // Use ECDSA encryption.
         rtcConfig.keyType = PeerConnection.KeyType.ECDSA;
         mPeerConnection = mPeerConnectionFactory.createPeerConnection(
-                rtcConfig, mConstraints, mPeerConnectionObserver);
+                rtcConfig, mPeerConnectionObserver);
     }
 
     public PeerConnection getmPeerConnection() {
@@ -108,11 +140,14 @@ public class WebRtcClient {
     }
 
     public void drainCandidate() {
-        if (queuedRemoteCandidates != null) {
-            for (IceCandidate candidate : queuedRemoteCandidates) {
-                mPeerConnection.addIceCandidate(candidate);
+        synchronized (queuedRemoteCandidates) {
+            if (queuedRemoteCandidates != null) {
+                Log.e("BaseCallActivity", "drainCandidate: " + Thread.currentThread().getName());
+                for (IceCandidate candidate : queuedRemoteCandidates) {
+                    mPeerConnection.addIceCandidate(candidate);
+                }
+                queuedRemoteCandidates = null;
             }
-            queuedRemoteCandidates = null;
         }
     }
 
@@ -157,24 +192,24 @@ public class WebRtcClient {
 
     public void startVideoSource() {
         if (mVideoSource != null && videoSourceStopped) {
-            mVideoSource.restart();
+            mVideoSource.getCapturerObserver().onCapturerStopped();
             videoSourceStopped = false;
         }
     }
 
-    public boolean isVideoSourceStopped(){
+    public boolean isVideoSourceStopped() {
         return videoSourceStopped;
     }
 
     public void stopVideoSource() {
         if (mVideoSource != null && !videoSourceStopped) {
-            mVideoSource.stop();
+            mVideoSource.getCapturerObserver().onCapturerStarted(true);
             videoSourceStopped = true;
         }
     }
 
     public VideoSource createVideoSource(VideoCapturer videoCapturer, MediaConstraints videoConstraints) {
-        mVideoSource = mPeerConnectionFactory.createVideoSource(videoCapturer, videoConstraints);
+        mVideoSource = mPeerConnectionFactory.createVideoSource(true);
         return mVideoSource;
     }
 
@@ -210,8 +245,18 @@ public class WebRtcClient {
         //PeerConnectionFactory.shutdownInternalTracer();
     }
 
-    public void sendSignal(String destination, String data) {
-        StompClient.getInstance().send(destination, data).subscribe();
-    }
+//    private static String getFieldTrials(PeerConnectionParameters peerConnectionParameters) {
+//        String fieldTrials = "";
+//        if (peerConnectionParameters.videoFlexfecEnabled) {
+//            fieldTrials += VIDEO_FLEXFEC_FIELDTRIAL;
+//            Log.d(TAG, "Enable FlexFEC field trial.");
+//        }
+//        fieldTrials += VIDEO_VP8_INTEL_HW_ENCODER_FIELDTRIAL;
+//        if (peerConnectionParameters.disableWebRtcAGCAndHPF) {
+//            fieldTrials += DISABLE_WEBRTC_AGC_FIELDTRIAL;
+//            Log.d(TAG, "Disable WebRTC AGC field trial.");
+//        }
+//        return fieldTrials;
+//    }
 
 }

@@ -1,6 +1,7 @@
 package cn.aorise.webrtc.webrtc;
 
 import android.content.Context;
+import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.os.Build;
 
@@ -19,6 +20,7 @@ public class RTCAudioManger {
     private AudioManager audioManager;
     private Context context;
     private int currentMode = MODE_EARPIECE;
+    private int defultMode;
 
     public static RTCAudioManger getManager() {
         if (RTCAudioManger == null) {
@@ -31,27 +33,37 @@ public class RTCAudioManger {
 
     public void init(Context context) {
         this.context = context;
-        initAudioManager();
+        audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        defultMode = audioManager.getMode();
+        audioManager.requestAudioFocus(null,AudioManager.STREAM_MUSIC,AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
+        changeToSpeakerMode();            //默认为扬声器播放
+    }
+
+    public void changeToRingtoneMode(){
+        audioManager.setMode(AudioManager.MODE_RINGTONE);
     }
 
     /**
      * 初始化音频管理器
      */
-    private void initAudioManager() {
-        audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+    public void changeToCallMode() {
+        if (audioManager==null){
+            return;
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
             audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
         } else {
             audioManager.setMode(AudioManager.MODE_IN_CALL);
         }
-        changeToSpeakerMode();            //默认为扬声器播放
     }
 
 
 
 
     public void close() {
-
+        audioManager.setMode(defultMode);
+        audioManager.abandonAudioFocus(null);
+        changeToSpeakerMode();
     }
 
     /**
@@ -67,21 +79,20 @@ public class RTCAudioManger {
      * 切换到听筒模式
      */
     public void changeToEarpieceMode() {
+        if (audioManager==null){
+            return;
+        }
         currentMode = MODE_EARPIECE;
         audioManager.setSpeakerphoneOn(false);
-//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
-//            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC,
-//                    audioManager.getStreamMaxVolume(AudioManager.MODE_IN_COMMUNICATION), AudioManager.FX_KEY_CLICK);
-//        } else {
-//            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC,
-//                    audioManager.getStreamMaxVolume(AudioManager.MODE_IN_CALL), AudioManager.FX_KEY_CLICK);
-//        }
     }
 
     /**
      * 切换到耳机模式
      */
     public void changeToHeadsetMode() {
+        if (audioManager==null){
+            return;
+        }
         currentMode = MODE_HEADSET;
         audioManager.setSpeakerphoneOn(false);
     }
@@ -90,6 +101,9 @@ public class RTCAudioManger {
      * 切换到外放模式
      */
     public void changeToSpeakerMode() {
+        if (audioManager==null){
+            return;
+        }
         currentMode = MODE_SPEAKER;
         audioManager.setSpeakerphoneOn(true);
     }
@@ -99,6 +113,9 @@ public class RTCAudioManger {
      * 调大音量
      */
     public void raiseVolume() {
+        if (audioManager==null){
+            return;
+        }
         int currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
         if (currentVolume < audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)) {
             audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC,
@@ -110,6 +127,9 @@ public class RTCAudioManger {
      * 调小音量
      */
     public void lowerVolume() {
+        if (audioManager==null){
+            return;
+        }
         int currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
         if (currentVolume > 0) {
             audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC,
@@ -127,6 +147,9 @@ public class RTCAudioManger {
     }
 
     private void setVolume(Context context, boolean upVolume) {
+        if (audioManager==null){
+            return;
+        }
         int volume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
         if (upVolume) {
             volume += 1;

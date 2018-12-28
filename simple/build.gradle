@@ -1,0 +1,130 @@
+apply plugin: 'com.android.application'
+
+// 版本发布名字
+def APP_NAME = 'aorise'
+// 版本发布时间
+def BUILD_TIME = new Date().format("yyyyMMdd", TimeZone.getTimeZone("UTC"))
+
+/**
+ * 1. gradle clean
+ * 2. gradle build / gradle assembleRelease
+ */
+android {
+    compileSdkVersion rootProject.ext.android.compileSdkVersion
+    // buildToolsVersion rootProject.ext.android.buildToolsVersion
+    dataBinding {
+        enabled = true
+    }
+    defaultConfig {
+        applicationId "com.mark.webrtc.simple"
+        minSdkVersion rootProject.ext.android.minSdkVersion
+        targetSdkVersion rootProject.ext.android.targetSdkVersion
+        versionCode 1
+        versionName "1.0.0"
+        multiDexEnabled true
+
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+
+        ndk.abiFilters = ['armeabi-v7a']
+    }
+    signingConfigs {
+        release {
+            try {
+                keyAlias KEY_ALIAS
+                keyPassword KEY_PASSWORD
+                storeFile file('/keystore/aoriseReleaseSignature.jks')
+                storePassword STORE_PASSWORD
+                v2SigningEnabled false
+            } catch (ex) {
+                throw new InvalidUserDataException(ex.toString())
+            }
+        }
+        debug {
+            try {
+                keyAlias KEY_ALIAS
+                keyPassword KEY_PASSWORD
+                storeFile file('../keystore/aoriseSignature.jks')
+                storePassword STORE_PASSWORD
+                v2SigningEnabled false
+            } catch (ex) {
+                throw new InvalidUserDataException(ex.toString())
+            }
+        }
+    }
+    buildTypes {
+        def BASE_URL = "BASE_URL"
+        release {
+            buildConfigField "String", BASE_URL, '"https://api.douban.com/"'
+            minifyEnabled false
+            shrinkResources false
+            zipAlignEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // 视频项目第一个版本就是用的debug签名发布
+            signingConfig signingConfigs.debug
+        }
+        debug {
+            buildConfigField "String", BASE_URL, '"https://api.douban.com/"'
+            minifyEnabled false
+            shrinkResources false
+            zipAlignEnabled false
+            signingConfig signingConfigs.debug
+        }
+    }
+
+//    android.variantFilter { variant ->
+//        //减少build时间
+//        if (!variant.getFlavors().get(0).name.equals('grid')) {
+//            variant.setIgnore(true);
+//        }
+//    }
+
+    lintOptions {
+        abortOnError false
+    }
+
+    dexOptions {
+        dexInProcess true
+        preDexLibraries true
+        javaMaxHeapSize "4g"
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    packagingOptions {
+        exclude 'META-INF/rxjava.properties'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "com.android.support:appcompat-v7:$rootProject.ext.android.supportLibraryVersion"
+    implementation "com.android.support:design:$rootProject.ext.android.supportLibraryVersion"
+    androidTestImplementation "com.android.support.test.espresso:espresso-core:$rootProject.ext.android.espressoVersion"
+    testImplementation "junit:junit:$rootProject.ext.android.junitVersion"
+    // 内存检查
+    debugImplementation "com.squareup.leakcanary:leakcanary-android:$rootProject.ext.thirdparty.leakcanaryVersion"
+    releaseImplementation "com.squareup.leakcanary:leakcanary-android-no-op:$rootProject.ext.thirdparty.leakcanaryVersion"
+    implementation 'com.android.support:multidex:1.0.2'
+    implementation project(':webrtc-client')
+    configurations.all {
+        //循环一个个的依赖库
+        resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+            //获取当前循环到的依赖库
+            def requested = details.requested
+            //如果这个依赖库群组的名字是com.android.support
+            if (requested.group == 'com.android.support') {
+                //且其名字不是以multidex开头的
+                if (!requested.name.startsWith("multidex")) {
+                    //这里指定需要统一的依赖版本
+                    details.useVersion "28.0.0"
+                }
+            }
+        }
+    }
+}
+
+/**
+ * gradle sonarqube
+ */
+apply from: '../config/sonarqube.gradle'

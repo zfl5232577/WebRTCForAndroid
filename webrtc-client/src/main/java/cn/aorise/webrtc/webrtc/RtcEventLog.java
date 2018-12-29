@@ -8,7 +8,7 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-package cn.aorise.webrtc.rtc;
+package cn.aorise.webrtc.webrtc;
 
 import android.os.ParcelFileDescriptor;
 import android.util.Log;

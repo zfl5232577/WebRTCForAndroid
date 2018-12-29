@@ -22,6 +22,7 @@ import com.umeng.commonsdk.UMConfigure;
 
 import org.webrtc.PeerConnection;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -320,19 +321,23 @@ public class ChatClient {
         API.MEIZUAPP_ID = config.getConfigParams().getMEIZUAPP_ID();
         API.MEIZUAPP_KEY = config.getConfigParams().getMEIZUAPP_KEY();
         if (!TextUtils.isEmpty(API.STUN_URL)) {
-            iceServers.add(new PeerConnection.IceServer(API.STUN_URL));
+            iceServers.add(PeerConnection.IceServer.builder(API.STUN_URL).createIceServer());
         }
         if (!TextUtils.isEmpty(API.TURN_URL) && !TextUtils.isEmpty(API.TURN_ACCOUNT) && !TextUtils.isEmpty(API.TURN_PASSWORD)) {
-            iceServers.add(new PeerConnection.IceServer(API.TURN_URL, API.TURN_ACCOUNT, API.TURN_PASSWORD));
+            iceServers.add(PeerConnection.IceServer.builder(API.TURN_URL)
+                    .setUsername(API.TURN_ACCOUNT)
+                    .setPassword(API.TURN_PASSWORD).createIceServer());
         }
     }
 
     public void addStunUrl(String stunUrl) {
-        iceServers.add(new PeerConnection.IceServer(stunUrl));
+        iceServers.add(PeerConnection.IceServer.builder(stunUrl).createIceServer());
     }
 
     public void addTurnUrl(String turnUrl, String turnAccount, String passWord) {
-        iceServers.add(new PeerConnection.IceServer(turnUrl, turnAccount, passWord));
+        iceServers.add(PeerConnection.IceServer.builder(turnUrl)
+                .setUsername(turnAccount)
+                .setPassword(passWord).createIceServer());
     }
 
     public LinkedList<PeerConnection.IceServer> getIceServers() {

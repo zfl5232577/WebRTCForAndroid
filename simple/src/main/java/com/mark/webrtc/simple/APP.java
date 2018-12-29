@@ -36,6 +36,8 @@ public class APP extends MultiDexApplication {
                 .xiaomiPush("2882303761517914834", "5971791479834")
                 .build();
         ChatClient.getInstance().init(context, config);
+        ChatClient.getInstance().addStunUrl("stun:222.244.147.121:3480");
+        ChatClient.getInstance().addTurnUrl("turn:222.244.147.121:3480", "test", "test");
         ChatClient.getInstance().setLogEnabled(BuildConfig.DEBUG);
         //设置自定义集成BaseCallActivity界面
 //        ChatClient.getInstance().setCallActivity(VisualCallActivity.class);

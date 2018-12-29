@@ -26,9 +26,9 @@ import cn.aorise.webrtc.api.Constant;
 import cn.aorise.webrtc.common.DialogUtil;
 import cn.aorise.webrtc.common.Mlog;
 import cn.aorise.webrtc.common.Utils;
+import cn.aorise.webrtc.signal.SignalCallBack;
 import cn.aorise.webrtc.signal.SignalMessage;
 import cn.aorise.webrtc.stomp.LifecycleEvent;
-import cn.aorise.webrtc.signal.SignalCallBack;
 import cn.aorise.webrtc.stomp.Stomp;
 import cn.aorise.webrtc.stomp.StompClient;
 import cn.aorise.webrtc.stomp.StompMessage;
@@ -107,6 +107,7 @@ public class SignalManager {
 
             @Override
             public void onMessage(StompMessage stompMessage) {
+                Log.e(TAG, "onMessage: " + Thread.currentThread().getName() + "====================");
                 Mlog.i(TAG, "onMessage: websocket----------------" + stompMessage.getPayload());
                 if (stompMessage.getPayload() != null) {
                     SignalMessage signalMessage = GsonUtils.fromJson(stompMessage.getPayload(), SignalMessage.class);
@@ -316,7 +317,7 @@ public class SignalManager {
      * @param context
      * @param user    被呼叫用户信息
      * @param isVideo 是否视频，false为语音通话
-     * @param isAdd 是否加入聊天室，假如多人室群聊，这里true,一对一传false
+     * @param isAdd   是否加入聊天室，假如多人室群聊，这里true,一对一传false
      */
     public void call(Context context, User user, boolean isVideo, boolean isAdd) {
         call(context, user, isVideo, isAdd, null);
@@ -326,17 +327,17 @@ public class SignalManager {
      * 呼叫视频，直接调起CallActivity,对方离线推送离线消息
      *
      * @param context
-     * @param user         被呼叫用户信息
+     * @param user    被呼叫用户信息
      * @param isVideo 是否视频，false为语音通话
-     * @param isAdd 是否加入聊天室，假如多人室群聊，这里true,一对一传false
-     * @param extras 自定义的Json数据串
-     * @param limit 聊天室默认人数限制，不传默认为9
+     * @param isAdd   是否加入聊天室，假如多人室群聊，这里true,一对一传false
+     * @param extras  自定义的Json数据串
+     * @param limit   聊天室默认人数限制，不传默认为9
      */
-    public void call(Context context, User user, boolean isVideo, boolean isAdd,String extras,int limit) {
+    public void call(Context context, User user, boolean isVideo, boolean isAdd, String extras, int limit) {
         if (NetworkUtils.isConnected()) {
             if (!Utils.isCalling(mContext)) {
                 if (!user.getUserName().equals(Constant.LoginInfo.user.getUserName())) {
-                    Intent intent = BaseCallActivity.getIntent(mContext, ChatClient.getInstance().getCallActivity(), user.getUserName(), user.getUserIcon(), user.getNickName(), BaseCallActivity.TYPE_INVITING, isVideo, isAdd, 0,extras,limit);
+                    Intent intent = BaseCallActivity.getIntent(mContext, ChatClient.getInstance().getCallActivity(), user.getUserName(), user.getUserIcon(), user.getNickName(), BaseCallActivity.TYPE_INVITING, isVideo, isAdd, 0, extras, limit);
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     mContext.startActivity(intent);
                 } else {

@@ -10,7 +10,6 @@ import com.bumptech.glide.Glide;
 import org.webrtc.SurfaceViewRenderer;
 
 import cn.aorise.webrtc.R;
-import cn.aorise.webrtc.api.Constant;
 import cn.aorise.webrtc.common.GlideCircleTransform;
 import cn.aorise.webrtc.webrtc.PercentFrameLayout;
 import cn.aorise.webrtc.webrtc.RTCAudioManger;
@@ -24,7 +23,7 @@ import cn.aorise.webrtc.webrtc.RTCAudioManger;
  *     version: 1.0
  * </pre>
  */
-public class DefaultCallActivity extends NewBaseCallActivity implements View.OnClickListener {
+public class DefaultCallActivity extends BaseCallActivity implements View.OnClickListener {
 
     private TextView tvName;
     private TextView tvAnswer;

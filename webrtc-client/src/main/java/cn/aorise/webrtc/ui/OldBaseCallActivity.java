@@ -27,21 +27,20 @@ import org.webrtc.Camera1Enumerator;
 import org.webrtc.Camera2Enumerator;
 import org.webrtc.CameraEnumerator;
 import org.webrtc.CameraVideoCapturer;
+import org.webrtc.DataChannel;
 import org.webrtc.EglBase;
 import org.webrtc.IceCandidate;
 import org.webrtc.Logging;
+import org.webrtc.MediaConstraints;
 import org.webrtc.MediaStream;
-import org.webrtc.PeerConnectionFactory;
+import org.webrtc.PeerConnection;
 import org.webrtc.RendererCommon;
 import org.webrtc.SessionDescription;
-import org.webrtc.StatsReport;
 import org.webrtc.SurfaceViewRenderer;
-import org.webrtc.VideoCapturer;
 import org.webrtc.VideoFrame;
 import org.webrtc.VideoSink;
 import org.webrtc.VideoTrack;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import cn.aorise.common.core.manager.ActivityManager;
@@ -53,70 +52,21 @@ import cn.aorise.webrtc.api.Constant;
 import cn.aorise.webrtc.chat.ChatClient;
 import cn.aorise.webrtc.common.DialogUtil;
 import cn.aorise.webrtc.common.GridBaseActivity;
+import cn.aorise.webrtc.common.Mlog;
 import cn.aorise.webrtc.common.Utils;
-import cn.aorise.webrtc.rtc.PeerConnectionClient;
 import cn.aorise.webrtc.signal.SignalCallBack;
 import cn.aorise.webrtc.signal.SignalMessage;
 import cn.aorise.webrtc.stomp.LifecycleEvent;
 import cn.aorise.webrtc.stomp.StompMessage;
+import cn.aorise.webrtc.webrtc.PeerConnectionListener;
+import cn.aorise.webrtc.webrtc.PeerConnectionParameters;
 import cn.aorise.webrtc.webrtc.PercentFrameLayout;
 import cn.aorise.webrtc.webrtc.RTCAudioManger;
+import cn.aorise.webrtc.webrtc.OldVersionWebRtcClient;
 
-public abstract class NewBaseCallActivity extends GridBaseActivity implements PeerConnectionClient.PeerConnectionEvents {
-    private static final String TAG = NewBaseCallActivity.class.getSimpleName();
-    public static final String EXTRA_ROOMID = "org.appspot.apprtc.ROOMID";
-    public static final String EXTRA_URLPARAMETERS = "org.appspot.apprtc.URLPARAMETERS";
-    public static final String EXTRA_LOOPBACK = "org.appspot.apprtc.LOOPBACK";
-    public static final String EXTRA_VIDEO_CALL = "org.appspot.apprtc.VIDEO_CALL";
-    public static final String EXTRA_SCREENCAPTURE = "org.appspot.apprtc.SCREENCAPTURE";
-    public static final String EXTRA_CAMERA2 = "org.appspot.apprtc.CAMERA2";
-    public static final String EXTRA_VIDEO_WIDTH = "org.appspot.apprtc.VIDEO_WIDTH";
-    public static final String EXTRA_VIDEO_HEIGHT = "org.appspot.apprtc.VIDEO_HEIGHT";
-    public static final String EXTRA_VIDEO_FPS = "org.appspot.apprtc.VIDEO_FPS";
-    public static final String EXTRA_VIDEO_CAPTUREQUALITYSLIDER_ENABLED =
-            "org.appsopt.apprtc.VIDEO_CAPTUREQUALITYSLIDER";
-    public static final String EXTRA_VIDEO_BITRATE = "org.appspot.apprtc.VIDEO_BITRATE";
-    public static final String EXTRA_VIDEOCODEC = "org.appspot.apprtc.VIDEOCODEC";
-    public static final String EXTRA_HWCODEC_ENABLED = "org.appspot.apprtc.HWCODEC";
-    public static final String EXTRA_CAPTURETOTEXTURE_ENABLED = "org.appspot.apprtc.CAPTURETOTEXTURE";
-    public static final String EXTRA_FLEXFEC_ENABLED = "org.appspot.apprtc.FLEXFEC";
-    public static final String EXTRA_AUDIO_BITRATE = "org.appspot.apprtc.AUDIO_BITRATE";
-    public static final String EXTRA_AUDIOCODEC = "org.appspot.apprtc.AUDIOCODEC";
-    public static final String EXTRA_NOAUDIOPROCESSING_ENABLED =
-            "org.appspot.apprtc.NOAUDIOPROCESSING";
-    public static final String EXTRA_AECDUMP_ENABLED = "org.appspot.apprtc.AECDUMP";
-    public static final String EXTRA_SAVE_INPUT_AUDIO_TO_FILE_ENABLED =
-            "org.appspot.apprtc.SAVE_INPUT_AUDIO_TO_FILE";
-    public static final String EXTRA_OPENSLES_ENABLED = "org.appspot.apprtc.OPENSLES";
-    public static final String EXTRA_DISABLE_BUILT_IN_AEC = "org.appspot.apprtc.DISABLE_BUILT_IN_AEC";
-    public static final String EXTRA_DISABLE_BUILT_IN_AGC = "org.appspot.apprtc.DISABLE_BUILT_IN_AGC";
-    public static final String EXTRA_DISABLE_BUILT_IN_NS = "org.appspot.apprtc.DISABLE_BUILT_IN_NS";
-    public static final String EXTRA_DISABLE_WEBRTC_AGC_AND_HPF =
-            "org.appspot.apprtc.DISABLE_WEBRTC_GAIN_CONTROL";
-    public static final String EXTRA_DISPLAY_HUD = "org.appspot.apprtc.DISPLAY_HUD";
-    public static final String EXTRA_TRACING = "org.appspot.apprtc.TRACING";
-    public static final String EXTRA_CMDLINE = "org.appspot.apprtc.CMDLINE";
-    public static final String EXTRA_RUNTIME = "org.appspot.apprtc.RUNTIME";
-    public static final String EXTRA_VIDEO_FILE_AS_CAMERA = "org.appspot.apprtc.VIDEO_FILE_AS_CAMERA";
-    public static final String EXTRA_SAVE_REMOTE_VIDEO_TO_FILE =
-            "org.appspot.apprtc.SAVE_REMOTE_VIDEO_TO_FILE";
-    public static final String EXTRA_SAVE_REMOTE_VIDEO_TO_FILE_WIDTH =
-            "org.appspot.apprtc.SAVE_REMOTE_VIDEO_TO_FILE_WIDTH";
-    public static final String EXTRA_SAVE_REMOTE_VIDEO_TO_FILE_HEIGHT =
-            "org.appspot.apprtc.SAVE_REMOTE_VIDEO_TO_FILE_HEIGHT";
-    public static final String EXTRA_USE_VALUES_FROM_INTENT =
-            "org.appspot.apprtc.USE_VALUES_FROM_INTENT";
-    public static final String EXTRA_DATA_CHANNEL_ENABLED = "org.appspot.apprtc.DATA_CHANNEL_ENABLED";
-    public static final String EXTRA_ORDERED = "org.appspot.apprtc.ORDERED";
-    public static final String EXTRA_MAX_RETRANSMITS_MS = "org.appspot.apprtc.MAX_RETRANSMITS_MS";
-    public static final String EXTRA_MAX_RETRANSMITS = "org.appspot.apprtc.MAX_RETRANSMITS";
-    public static final String EXTRA_PROTOCOL = "org.appspot.apprtc.PROTOCOL";
-    public static final String EXTRA_NEGOTIATED = "org.appspot.apprtc.NEGOTIATED";
-    public static final String EXTRA_ID = "org.appspot.apprtc.ID";
-    public static final String EXTRA_ENABLE_RTCEVENTLOG = "org.appspot.apprtc.ENABLE_RTCEVENTLOG";
-    public static final String EXTRA_USE_LEGACY_AUDIO_DEVICE =
-            "org.appspot.apprtc.USE_LEGACY_AUDIO_DEVICE";
-
+@Deprecated
+public abstract class OldBaseCallActivity extends GridBaseActivity implements PeerConnectionListener {
+    private static final String TAG = OldBaseCallActivity.class.getSimpleName();
     private static final int CALL_TIME_OUT = 60000;//主叫超时
     private static final int CALLED_TIME_OUT = 55000;//被叫超时
     private static final int CHECKING_TIME_OUT = 55000;//连接中超时
@@ -143,6 +93,14 @@ public abstract class NewBaseCallActivity extends GridBaseActivity implements Pe
     private static final int SURFACE_REMOTE_WIDTH = 100;
     private static final int SURFACE_REMOTE_HEIGHT = 100;
 
+    private static final String MAX_VIDEO_WIDTH_CONSTRAINT = "maxWidth";
+    private static final String MIN_VIDEO_WIDTH_CONSTRAINT = "minWidth";
+    private static final String MAX_VIDEO_HEIGHT_CONSTRAINT = "maxHeight";
+    private static final String MIN_VIDEO_HEIGHT_CONSTRAINT = "minHeight";
+
+    private static final String VIDEO_CODEC_VP9 = "VP9";
+    private static final String AUDIO_CODEC_OPUS = "opus";
+
     private static final String[] MANDATORY_PERMISSIONS = {
             "android.permission.MODIFY_AUDIO_SETTINGS",
             "android.permission.RECORD_AUDIO",
@@ -150,8 +108,8 @@ public abstract class NewBaseCallActivity extends GridBaseActivity implements Pe
     };
     private boolean permission_granted = true;
 
-    private static PeerConnectionClient mWebRtcClient;
-    private PeerConnectionClient.PeerConnectionParameters mPeerConnectionParameters;
+    private static OldVersionWebRtcClient mWebRtcClient;
+    private PeerConnectionParameters mPeerConnectionParameters;
     private MediaStream mLocalStream;
     private MediaPlayer mMediaPlayer;
     private Vibrator vibrator;
@@ -181,7 +139,6 @@ public abstract class NewBaseCallActivity extends GridBaseActivity implements Pe
     private PercentFrameLayout layoutRemoteVideo;
     private final ProxyVideoSink remoteProxyRenderer = new ProxyVideoSink();
     private final ProxyVideoSink localProxyRenderer = new ProxyVideoSink();
-    private final List<VideoSink> remoteSinks = new ArrayList<>();
     private SignalCallBack signalCallBack;
     private PhoneBroadcastReceive mPhoneBroadcastReceive;
     private boolean isInited = false;
@@ -207,7 +164,6 @@ public abstract class NewBaseCallActivity extends GridBaseActivity implements Pe
         remoteProxyRenderer.setTarget(surfaceRemote);
         layoutLocalVideo = setLayoutLocalVideo();
         layoutRemoteVideo = setLayoutRemoteVideo();
-        remoteSinks.add(remoteProxyRenderer);
         rootEglBase = EglBase.create();
         if (isVideoCall) {
             scalingType = RendererCommon.ScalingType.SCALE_ASPECT_FILL;
@@ -335,7 +291,7 @@ public abstract class NewBaseCallActivity extends GridBaseActivity implements Pe
         isVideoCall = intent.getBooleanExtra("isVideoCall", true);
         createtime = intent.getLongExtra("createtime", 0);
         limit = intent.getIntExtra("limit", 1);
-        if (NewBaseCallActivity.TYPE_INVITING == type) {
+        if (OldBaseCallActivity.TYPE_INVITING == type) {
             isInitiator = true;
             mRunnable = () -> {
                 sendSignal(Constant.SignalDestination.SIGNAL_Destination_REMOVE, "", Constant.SignalType.SIGNAL_REMOVED);
@@ -373,14 +329,10 @@ public abstract class NewBaseCallActivity extends GridBaseActivity implements Pe
             return;
         }
         isInited = true;
-        boolean loopback = false;
-        mPeerConnectionParameters = new PeerConnectionClient.PeerConnectionParameters(isVideoCall,loopback,ScreenUtils.getScreenHeight(),ScreenUtils.getScreenHeight(),30);
-        mWebRtcClient = new PeerConnectionClient(this.getApplicationContext(), rootEglBase, mPeerConnectionParameters, this);
-        PeerConnectionFactory.Options options = new PeerConnectionFactory.Options();
-        if (loopback) {
-            options.networkIgnoreMask = 0;
-        }
-        mWebRtcClient.createPeerConnectionFactory(options);
+        Log.e(TAG, "init: "+ScreenUtils.getScreenWidth()+ScreenUtils.getScreenHeight() );
+        mPeerConnectionParameters = new PeerConnectionParameters(
+                isVideoCall, false, ScreenUtils.getScreenHeight(), ScreenUtils.getScreenWidth(), 30, 1, VIDEO_CODEC_VP9, true, 1, AUDIO_CODEC_OPUS, true);
+        mWebRtcClient = new OldVersionWebRtcClient(this.getApplicationContext(), rootEglBase.getEglBaseContext(), mPeerConnectionParameters, this);
         setSignalCallBack();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             List<String> unAuthPermissions = Utils.findUnAuthPermissions(this, MANDATORY_PERMISSIONS);
@@ -467,7 +419,7 @@ public abstract class NewBaseCallActivity extends GridBaseActivity implements Pe
                         disConnect();
                     }
                 } else if (Constant.SignalType.SIGNAL_DUPLICATE_CONNECTION.equals(signalMessageType)) {
-                    DialogUtil.showDialog(NewBaseCallActivity.this, getString(R.string.grid_dialog_conflict_login_title),
+                    DialogUtil.showDialog(OldBaseCallActivity.this, getString(R.string.grid_dialog_conflict_login_title),
                             getString(R.string.grid_dialog_conflict_login_content), getString(R.string.grid_dialog_conflict_login_exit),
                             getString(R.string.grid_dialog_conflict_login_again), R.color.grid_txt_default, R.color.grid_txt_dialog_right,
                             v -> {
@@ -475,7 +427,7 @@ public abstract class NewBaseCallActivity extends GridBaseActivity implements Pe
                                     ChatClient.getInstance().logout();
                                     SPUtils.getInstance().remove(Constant.SPCache.LOGIN);
                                     DialogUtil.dismissDialog();
-                                    ActivityManager.getInstance().appExit(NewBaseCallActivity.this);
+                                    ActivityManager.getInstance().appExit(OldBaseCallActivity.this);
                                 } else if (v.getId() == R.id.tv_dialog_right) {
                                     ChatClient.getInstance().getSignalManager().reconnect(true);
                                     DialogUtil.dismissDialog();
@@ -568,7 +520,7 @@ public abstract class NewBaseCallActivity extends GridBaseActivity implements Pe
                                 if (!isInitiator) {
                                     sendSignal(Constant.SignalDestination.SIGNAL_Destination_REFUSE, "", Constant.SignalType.SIGNAL_MEMBER_REFUSED);
                                 }
-                                Utils.pemissionSet(NewBaseCallActivity.this);
+                                Utils.pemissionSet(OldBaseCallActivity.this);
                                 disConnect();
                             }
                         }
@@ -614,7 +566,7 @@ public abstract class NewBaseCallActivity extends GridBaseActivity implements Pe
         releaseMediaPlayer();
         setmLocalStream();
         mWebRtcClient.setRemoteDescription(parseSdp(data));
-        mWebRtcClient.createAnswer();
+        mWebRtcClient.createAnswerSdp();
         mHandler.removeCallbacksAndMessages(null);
         //假如一直在连接中，15秒后自动断开
         mRunnable = () -> {
@@ -741,7 +693,7 @@ public abstract class NewBaseCallActivity extends GridBaseActivity implements Pe
     }
 
     private void invite() {
-        mWebRtcClient.createOffer();
+        mWebRtcClient.createOfferSdp();
     }
 
     private void playCallRing() {
@@ -772,167 +724,184 @@ public abstract class NewBaseCallActivity extends GridBaseActivity implements Pe
         }
     }
 
-//    @Override
-//    public void onCreateSuccess(SessionDescription sessionDescription) {
-//        Mlog.e(TAG, "onCreateSuccess");
-//        //set成功回调下面的onSetSuccess方法
-//        mWebRtcClient.setLocalDescription(sessionDescription);
-//    }
-//
-//    @Override
-//    public void onSetSuccess() {
-//        Mlog.e(TAG, "onSetSuccess: ");
-//        SessionDescription localSdp = mWebRtcClient.getmPeerConnection().getLocalDescription();
-//        if (localSdp == null) {
-//            return;
-//        }
-//        if (isInitiator) {
-//            if (mWebRtcClient.getmPeerConnection().getRemoteDescription() != null) {
-//                getLocalCandidate();
-//                mWebRtcClient.drainCandidate();
-//            } else {
-//                if (isAdd) {
-//                    sendSignal(Constant.SignalDestination.SIGNAL_Destination_ADD, Sdp2data(localSdp), Constant.SignalType.SIGNAL_ADD);
-//                } else {
-//                    sendSignal(Constant.SignalDestination.SIGNAL_Destination_OFFERE, Sdp2data(localSdp), Constant.SignalType.SIGNAL_OFFERED);
-//                }
-//                mHandler.postDelayed(mRunnable, CALL_TIME_OUT);
-//            }
-//        } else {
-//            if (isAdd) {
-//                sendSignal(Constant.SignalDestination.SIGNAL_Destination_ADDANSWER, Sdp2data(localSdp), Constant.SignalType.SIGNAL_ANSWERED);
-//            } else {
-//                sendSignal(Constant.SignalDestination.SIGNAL_Destination_ANSWER, Sdp2data(localSdp), Constant.SignalType.SIGNAL_ANSWERED);
-//            }
-//            mWebRtcClient.drainCandidate();
-//        }
-//
-//    }
-//
-//    @Override
-//    public void onCreateFailure(String s) {
-//        Mlog.e(TAG, "onCreateFailure: ");
-//    }
-//
-//    @Override
-//    public void onSetFailure(String s) {
-//        Mlog.e(TAG, "onSetFailure: ");
-//    }
-//
-//    @Override
-//    public void onSignalingChange(PeerConnection.SignalingState signalingState) {
-//        Mlog.e(TAG, "onSignalingChange: ");
-//    }
-//
-//    @Override
-//    public void onIceConnectionChange(PeerConnection.IceConnectionState iceConnectionState) {
-//        Mlog.e(TAG, "onIceConnectionChange: " + iceConnectionState);
-//        if (iceConnectionState == PeerConnection.IceConnectionState.CONNECTED) {
-//            mHandler.removeCallbacksAndMessages(null);
-//            isCalling = true;
-//            type = TYPE_CALLING;
-//            iceConnected = true;
-//            runOnUiThread(new Runnable() {
-//                @Override
-//                public void run() {
-//                    updateCallView();
-//                    updateVideoView();
-//                }
-//            });
-//        } else if (iceConnectionState == PeerConnection.IceConnectionState.DISCONNECTED || iceConnectionState == PeerConnection.IceConnectionState.FAILED) {
-//            iceConnected = false;
-//            mHandler.removeCallbacksAndMessages(null);
-//            runOnUiThread(new Runnable() {
-//                @Override
-//                public void run() {
-//                    if (!DialogUtil.isShow()) {
-//                        showLongToast(getString(R.string.grid_call_disconnect));
-//                        if (isInitiator && !isAdd) {
-//                            sendSignal(Constant.SignalDestination.SIGNAL_Destination_REMOVE, "", Constant.SignalType.SIGNAL_REMOVED);
-//                        }
-//                        sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "网络波动断开连接", Constant.SignalType.SIGNAL_MEMBER_LEAVED);
-//                        disConnect();
-//                    }
-//                }
-//            });
-//
-//        }
-//    }
-//
-//    @Override
-//    public void onIceGatheringChange(PeerConnection.IceGatheringState iceGatheringState) {
-//        Mlog.e(TAG, "onIceGatheringChange: ");
-//    }
-//
-//    @Override
-//    public void onIceCandidate(IceCandidate iceCandidate) {
-//        Mlog.e(TAG, "onIceCandidate: ");
-//        if (isInitiator) {
-//            if (mWebRtcClient.getmPeerConnection().getRemoteDescription() != null) {
-//                sendLocalCandidate(iceCandidate);
-//            } else {
-//                mWebRtcClient.addLocalIceCandidate(iceCandidate);
-//            }
-//        } else {
-//            sendLocalCandidate(iceCandidate);
-//        }
-//    }
-//
-//    @Override
-//    public void onAddStream(MediaStream mediaStream) {
-//        if (surfaceRemote == null) {
-//            return;
-//        }
-//        Mlog.e(TAG, "onAddStream: ");
-//        if (mWebRtcClient.getmPeerConnection() == null) {
-//            return;
-//        }
-//        if (mediaStream.audioTracks.size() > 1 || mediaStream.videoTracks.size() > 1) {
-//            return;
-//        }
-//        if (mediaStream.videoTracks.size() == 1) {
-//            remoteVideoTrack = mediaStream.videoTracks.get(0);
-//            remoteVideoTrack.setEnabled(true);
-//            remoteVideoTrack.addSink(remoteProxyRenderer);
-//        }
-//    }
-//
-//    @Override
-//    public void onRemoveStream(MediaStream mediaStream) {
-//        Mlog.e(TAG, "onRemoveStream: ");
-//        remoteVideoTrack = null;
-//    }
-//
-//    @Override
-//    public void onDataChannel(DataChannel dataChannel) {
-//        Mlog.e(TAG, "onDataChannel: ");
-//    }
-//
-//    @Override
-//    public void onRenegotiationNeeded() {
-//        Mlog.e(TAG, "onRenegotiationNeeded: ");
-//    }
+    @Override
+    public void onCreateSuccess(SessionDescription sessionDescription) {
+        Mlog.e(TAG, "onCreateSuccess");
+        //set成功回调下面的onSetSuccess方法
+        mWebRtcClient.setLocalDescription(sessionDescription);
+    }
+
+    @Override
+    public void onSetSuccess() {
+        Mlog.e(TAG, "onSetSuccess: ");
+        SessionDescription localSdp = mWebRtcClient.getmPeerConnection().getLocalDescription();
+        if (localSdp == null) {
+            return;
+        }
+        if (isInitiator) {
+            if (mWebRtcClient.getmPeerConnection().getRemoteDescription() != null) {
+                getLocalCandidate();
+                mWebRtcClient.drainCandidate();
+            } else {
+                if (isAdd) {
+                    sendSignal(Constant.SignalDestination.SIGNAL_Destination_ADD, Sdp2data(localSdp), Constant.SignalType.SIGNAL_ADD);
+                } else {
+                    sendSignal(Constant.SignalDestination.SIGNAL_Destination_OFFERE, Sdp2data(localSdp), Constant.SignalType.SIGNAL_OFFERED);
+                }
+                mHandler.postDelayed(mRunnable, CALL_TIME_OUT);
+            }
+        } else {
+            if (isAdd) {
+                sendSignal(Constant.SignalDestination.SIGNAL_Destination_ADDANSWER, Sdp2data(localSdp), Constant.SignalType.SIGNAL_ANSWERED);
+            } else {
+                sendSignal(Constant.SignalDestination.SIGNAL_Destination_ANSWER, Sdp2data(localSdp), Constant.SignalType.SIGNAL_ANSWERED);
+            }
+            mWebRtcClient.drainCandidate();
+        }
+
+    }
+
+    @Override
+    public void onCreateFailure(String s) {
+        Mlog.e(TAG, "onCreateFailure: ");
+    }
+
+    @Override
+    public void onSetFailure(String s) {
+        Mlog.e(TAG, "onSetFailure: ");
+    }
+
+    @Override
+    public void onSignalingChange(PeerConnection.SignalingState signalingState) {
+        Mlog.e(TAG, "onSignalingChange: ");
+    }
+
+    @Override
+    public void onIceConnectionChange(PeerConnection.IceConnectionState iceConnectionState) {
+        Mlog.e(TAG, "onIceConnectionChange: " + iceConnectionState);
+        if (iceConnectionState == PeerConnection.IceConnectionState.CONNECTED) {
+            mHandler.removeCallbacksAndMessages(null);
+            isCalling = true;
+            type = TYPE_CALLING;
+            iceConnected = true;
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    updateCallView();
+                    updateVideoView();
+                }
+            });
+        } else if (iceConnectionState == PeerConnection.IceConnectionState.DISCONNECTED || iceConnectionState == PeerConnection.IceConnectionState.FAILED) {
+            iceConnected = false;
+            mHandler.removeCallbacksAndMessages(null);
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if (!DialogUtil.isShow()) {
+                        showLongToast(getString(R.string.grid_call_disconnect));
+                        if (isInitiator && !isAdd) {
+                            sendSignal(Constant.SignalDestination.SIGNAL_Destination_REMOVE, "", Constant.SignalType.SIGNAL_REMOVED);
+                        }
+                        sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "网络波动断开连接", Constant.SignalType.SIGNAL_MEMBER_LEAVED);
+                        disConnect();
+                    }
+                }
+            });
+
+        }
+    }
+
+    @Override
+    public void onIceGatheringChange(PeerConnection.IceGatheringState iceGatheringState) {
+        Mlog.e(TAG, "onIceGatheringChange: ");
+    }
+
+    @Override
+    public void onIceCandidate(IceCandidate iceCandidate) {
+        Mlog.e(TAG, "onIceCandidate: ");
+        if (isInitiator) {
+            if (mWebRtcClient.getmPeerConnection().getRemoteDescription() != null) {
+                sendLocalCandidate(iceCandidate);
+            } else {
+                mWebRtcClient.addLocalIceCandidate(iceCandidate);
+            }
+        } else {
+            sendLocalCandidate(iceCandidate);
+        }
+    }
+
+    @Override
+    public void onAddStream(MediaStream mediaStream) {
+        if (surfaceRemote == null) {
+            return;
+        }
+        Mlog.e(TAG, "onAddStream: ");
+        if (mWebRtcClient.getmPeerConnection() == null) {
+            return;
+        }
+        if (mediaStream.audioTracks.size() > 1 || mediaStream.videoTracks.size() > 1) {
+            return;
+        }
+        if (mediaStream.videoTracks.size() == 1) {
+            remoteVideoTrack = mediaStream.videoTracks.get(0);
+            remoteVideoTrack.setEnabled(true);
+            remoteVideoTrack.addSink(remoteProxyRenderer);
+        }
+    }
+
+    @Override
+    public void onRemoveStream(MediaStream mediaStream) {
+        Mlog.e(TAG, "onRemoveStream: ");
+        remoteVideoTrack = null;
+    }
+
+    @Override
+    public void onDataChannel(DataChannel dataChannel) {
+        Mlog.e(TAG, "onDataChannel: ");
+    }
+
+    @Override
+    public void onRenegotiationNeeded() {
+        Mlog.e(TAG, "onRenegotiationNeeded: ");
+    }
 
     private void setmLocalStream() {
         mRTCAudioManger.changeToCallMode();
         if (mWebRtcClient != null) {
-            VideoCapturer videoCapturer = null;
-            if (mPeerConnectionParameters.videoCallEnabled) {
-                videoCapturer = getVideoCapturer();
-            }
-            mWebRtcClient.createPeerConnection(
-                    localProxyRenderer, remoteSinks, videoCapturer);
-            if (NewBaseCallActivity.TYPE_INVITING == type) {
-                invite();
+            mLocalStream = mWebRtcClient.createLocalStream();
+            if (mLocalStream != null) {
+                if (isVideoCall) {
+                    MediaConstraints videoConstraints = new MediaConstraints();
+                    if (mPeerConnectionParameters.videoCallEnabled) {
+                        videoConstraints.mandatory.add(new MediaConstraints.KeyValuePair(MIN_VIDEO_WIDTH_CONSTRAINT, "640"));
+                        videoConstraints.mandatory.add(new MediaConstraints.KeyValuePair(MAX_VIDEO_WIDTH_CONSTRAINT, Integer.toString(mPeerConnectionParameters.videoWidth)));
+                        videoConstraints.mandatory.add(new MediaConstraints.KeyValuePair(MIN_VIDEO_HEIGHT_CONSTRAINT, "480"));
+                        videoConstraints.mandatory.add(new MediaConstraints.KeyValuePair(MAX_VIDEO_HEIGHT_CONSTRAINT, Integer.toString(mPeerConnectionParameters.videoHeight)));
+                        videoConstraints.mandatory.add(new MediaConstraints.KeyValuePair("maxFrameRate", Integer.toString(mPeerConnectionParameters.videoFps)));
+                    }
+                    videoCapturer = getVideoCapturer();
+                    localVideoTrack = mWebRtcClient.createVideoTrack(mWebRtcClient.createVideoSource(videoCapturer, videoConstraints));
+                    if (surfaceLocal != null) {
+                        localVideoTrack.addSink(localProxyRenderer);
+                    }
+                    mLocalStream.addTrack(localVideoTrack);
+                }
+                MediaConstraints audioConstraints = new MediaConstraints();
+                mLocalStream.addTrack(mWebRtcClient.createAudioTrack(audioConstraints));
+                mWebRtcClient.setLocalStream(mLocalStream);
+                if (OldBaseCallActivity.TYPE_INVITING == type) {
+                    invite();
+                }
             }
         }
     }
 
+
     private CameraVideoCapturer getVideoCapturer() {
         CameraEnumerator enumerator;
-        if (Camera2Enumerator.isSupported(this)) {
+        if (Camera2Enumerator.isSupported(this)){
             enumerator = new Camera2Enumerator(this);
-        } else {
+        }else {
             enumerator = new Camera1Enumerator(false);
         }
         final String[] deviceNames = enumerator.getDeviceNames();
@@ -964,6 +933,12 @@ public abstract class NewBaseCallActivity extends GridBaseActivity implements Pe
         }
 
         return null;
+    }
+
+    private void getLocalCandidate() {
+        for (IceCandidate iceCandidate : mWebRtcClient.getQueuedLocalCandidates()) {
+            sendLocalCandidate(iceCandidate);
+        }
     }
 
     private void sendLocalCandidate(IceCandidate iceCandidate) {
@@ -1020,7 +995,7 @@ public abstract class NewBaseCallActivity extends GridBaseActivity implements Pe
         }
 
         if (mWebRtcClient != null) {
-            mWebRtcClient.close();
+            mWebRtcClient.disposePeerConnection();
             mWebRtcClient = null;
         }
         if (surfaceLocal != null) {
@@ -1028,6 +1003,10 @@ public abstract class NewBaseCallActivity extends GridBaseActivity implements Pe
         }
         if (surfaceRemote != null) {
             surfaceRemote.release();
+        }
+        if (rootEglBase != null) {
+            rootEglBase.release();
+            rootEglBase = null;
         }
         finish();
     }
@@ -1097,119 +1076,6 @@ public abstract class NewBaseCallActivity extends GridBaseActivity implements Pe
             e.printStackTrace();
         }
         return iceCandidate;
-    }
-
-    @Override
-    public void onLocalDescription(SessionDescription localSdp) {
-        if (localSdp == null) {
-            return;
-        }
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                if (isInitiator) {
-                    if (isAdd) {
-                        sendSignal(Constant.SignalDestination.SIGNAL_Destination_ADD, Sdp2data(localSdp), Constant.SignalType.SIGNAL_ADD);
-                    } else {
-                        sendSignal(Constant.SignalDestination.SIGNAL_Destination_OFFERE, Sdp2data(localSdp), Constant.SignalType.SIGNAL_OFFERED);
-                    }
-                    mHandler.postDelayed(mRunnable, CALL_TIME_OUT);
-                } else {
-                    if (isAdd) {
-                        sendSignal(Constant.SignalDestination.SIGNAL_Destination_ADDANSWER, Sdp2data(localSdp), Constant.SignalType.SIGNAL_ANSWERED);
-                    } else {
-                        sendSignal(Constant.SignalDestination.SIGNAL_Destination_ANSWER, Sdp2data(localSdp), Constant.SignalType.SIGNAL_ANSWERED);
-                    }
-                }
-                if (mPeerConnectionParameters.videoMaxBitrate > 0) {
-                    Log.d(TAG, "Set video maximum bitrate: " + mPeerConnectionParameters.videoMaxBitrate);
-                    mWebRtcClient.setVideoMaxBitrate(mPeerConnectionParameters.videoMaxBitrate);
-                }
-            }
-        });
-    }
-
-    @Override
-    public void onIceCandidate(IceCandidate candidate) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                sendLocalCandidate(candidate);
-            }
-        });
-    }
-
-    @Override
-    public void onIceCandidatesRemoved(IceCandidate[] candidates) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                if (mWebRtcClient == null) {
-                    Log.e(TAG, "Received ICE candidate removals for a non-initialized peer connection.");
-                    return;
-                }
-                mWebRtcClient.removeRemoteIceCandidates(candidates);
-            }
-        });
-    }
-
-    @Override
-    public void onIceConnected() {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                mHandler.removeCallbacksAndMessages(null);
-                isCalling = true;
-                type = TYPE_CALLING;
-                iceConnected = true;
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        updateCallView();
-                        updateVideoView();
-                    }
-                });
-            }
-        });
-    }
-
-    @Override
-    public void onIceDisconnected() {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                iceConnected = false;
-                mHandler.removeCallbacksAndMessages(null);
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (!DialogUtil.isShow()) {
-                            showLongToast(getString(R.string.grid_call_disconnect));
-                            if (isInitiator && !isAdd) {
-                                sendSignal(Constant.SignalDestination.SIGNAL_Destination_REMOVE, "", Constant.SignalType.SIGNAL_REMOVED);
-                            }
-                            sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "网络波动断开连接", Constant.SignalType.SIGNAL_MEMBER_LEAVED);
-                            disConnect();
-                        }
-                    }
-                });
-            }
-        });
-    }
-
-    @Override
-    public void onPeerConnectionClosed() {
-
-    }
-
-    @Override
-    public void onPeerConnectionStatsReady(StatsReport[] reports) {
-
-    }
-
-    @Override
-    public void onPeerConnectionError(String description) {
-
     }
 
     public class PhoneBroadcastReceive extends BroadcastReceiver {

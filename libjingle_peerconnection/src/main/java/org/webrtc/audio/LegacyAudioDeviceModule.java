@@ -16,7 +16,7 @@ import org.webrtc.voiceengine.WebRtcAudioTrack;
 /**
  * This class represents the legacy AudioDeviceModule that is currently hardcoded into C++ WebRTC.
  * It will return a null native AudioDeviceModule pointer, leading to an internal object being
- * created inside WebRTC that is controlled by static calls to the classes under the voiceengine
+ * created inside WebRTC that is controlled by static calls to the classes under the org.webrtc.voiceengine
  * package. Please use the new JavaAudioDeviceModule instead of this class.
  */
 @Deprecated

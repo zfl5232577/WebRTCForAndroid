@@ -1038,6 +1038,10 @@ public abstract class BaseCallActivity extends GridBaseActivity implements WebRt
             mWebRtcClient.close();
             mWebRtcClient = null;
         }
+        if (mHandler != null) {
+            mHandler.removeCallbacksAndMessages(null);
+            mHandler = null;
+        }
         finish();
     }
 
@@ -1166,46 +1170,36 @@ public abstract class BaseCallActivity extends GridBaseActivity implements WebRt
 
     @Override
     public void onIceConnected() {
-        runOnUiThread(new Runnable() {
+        mHandler.removeCallbacksAndMessages(null);
+        isCalling = true;
+        type = TYPE_CALLING;
+        iceConnected = true;
+        mHandler.post(new Runnable() {
             @Override
             public void run() {
-                mHandler.removeCallbacksAndMessages(null);
-                isCalling = true;
-                type = TYPE_CALLING;
-                iceConnected = true;
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        updateCallView();
-                        updateVideoView();
-                    }
-                });
+                updateCallView();
+                updateVideoView();
             }
         });
     }
 
     @Override
     public void onIceDisconnected() {
-        runOnUiThread(new Runnable() {
+        iceConnected = false;
+        mHandler.removeCallbacksAndMessages(null);
+        mHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
-                iceConnected = false;
-                mHandler.removeCallbacksAndMessages(null);
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (!DialogUtil.isShow()) {
-                            showLongToast(getString(R.string.grid_call_disconnect));
-                            if (isInitiator && !isAdd) {
-                                sendSignal(Constant.SignalDestination.SIGNAL_Destination_REMOVE, "", Constant.SignalType.SIGNAL_REMOVED);
-                            }
-                            sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "网络波动断开连接", Constant.SignalType.SIGNAL_MEMBER_LEAVED);
-                            disConnect();
-                        }
+                if (!DialogUtil.isShow()) {
+                    showLongToast(getString(R.string.grid_call_disconnect));
+                    if (isInitiator && !isAdd) {
+                        sendSignal(Constant.SignalDestination.SIGNAL_Destination_REMOVE, "", Constant.SignalType.SIGNAL_REMOVED);
                     }
-                });
+                    sendSignal(Constant.SignalDestination.SIGNAL_Destination_LEAVE, "网络波动断开连接", Constant.SignalType.SIGNAL_MEMBER_LEAVED);
+                    disConnect();
+                }
             }
-        });
+        }, 1500);
     }
 
     @Override

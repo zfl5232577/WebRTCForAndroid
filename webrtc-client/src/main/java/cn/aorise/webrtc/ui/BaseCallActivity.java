@@ -30,7 +30,6 @@ import org.webrtc.CameraVideoCapturer;
 import org.webrtc.EglBase;
 import org.webrtc.IceCandidate;
 import org.webrtc.Logging;
-import org.webrtc.MediaStream;
 import org.webrtc.PeerConnectionFactory;
 import org.webrtc.RendererCommon;
 import org.webrtc.SessionDescription;
@@ -39,7 +38,6 @@ import org.webrtc.SurfaceViewRenderer;
 import org.webrtc.VideoCapturer;
 import org.webrtc.VideoFrame;
 import org.webrtc.VideoSink;
-import org.webrtc.VideoTrack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -54,13 +52,13 @@ import cn.aorise.webrtc.chat.ChatClient;
 import cn.aorise.webrtc.common.DialogUtil;
 import cn.aorise.webrtc.common.GridBaseActivity;
 import cn.aorise.webrtc.common.Utils;
-import cn.aorise.webrtc.webrtc.WebRtcClient;
 import cn.aorise.webrtc.signal.SignalCallBack;
 import cn.aorise.webrtc.signal.SignalMessage;
 import cn.aorise.webrtc.stomp.LifecycleEvent;
 import cn.aorise.webrtc.stomp.StompMessage;
 import cn.aorise.webrtc.webrtc.PercentFrameLayout;
 import cn.aorise.webrtc.webrtc.RTCAudioManger;
+import cn.aorise.webrtc.webrtc.WebRtcClient;
 
 public abstract class BaseCallActivity extends GridBaseActivity implements WebRtcClient.PeerConnectionEvents {
     private static final String TAG = BaseCallActivity.class.getSimpleName();
@@ -119,7 +117,7 @@ public abstract class BaseCallActivity extends GridBaseActivity implements WebRt
 
     private static final int CALL_TIME_OUT = 60000;//主叫超时
     private static final int CALLED_TIME_OUT = 55000;//被叫超时
-    private static final int CHECKING_TIME_OUT = 55000;//连接中超时
+    private static final int CHECKING_TIME_OUT = 15000;//连接中超时
 
     public static final int TYPE_INVITING = 1;
     public static final int TYPE_CALLING = 2;
@@ -149,10 +147,32 @@ public abstract class BaseCallActivity extends GridBaseActivity implements WebRt
             "android.permission.CAMERA"
     };
     private boolean permission_granted = true;
+    protected boolean isAudioEnabled = true;
+    private int lastMode;
+
+    private static class ProxyVideoSink implements VideoSink {
+        private VideoSink target;
+
+        @Override
+        synchronized public void onFrame(VideoFrame frame) {
+            if (target == null) {
+                Logging.d(TAG, "Dropping frame in proxy because target is null.");
+                return;
+            }
+
+            target.onFrame(frame);
+        }
+
+        synchronized public void setTarget(VideoSink target) {
+            this.target = target;
+        }
+    }
+
+    private final ProxyVideoSink remoteProxyRenderer = new ProxyVideoSink();
+    private final ProxyVideoSink localProxyVideoSink = new ProxyVideoSink();
 
     private static WebRtcClient mWebRtcClient;
     private WebRtcClient.PeerConnectionParameters mPeerConnectionParameters;
-    private MediaStream mLocalStream;
     private MediaPlayer mMediaPlayer;
     private Vibrator vibrator;
     protected RTCAudioManger mRTCAudioManger;
@@ -171,7 +191,6 @@ public abstract class BaseCallActivity extends GridBaseActivity implements WebRt
     private String data;
 
     private boolean iceConnected = false;
-    private RendererCommon.ScalingType scalingType;
     private EglBase rootEglBase;
     private SurfaceViewRenderer surfaceLocal;
     private SurfaceViewRenderer surfaceRemote;
@@ -181,7 +200,6 @@ public abstract class BaseCallActivity extends GridBaseActivity implements WebRt
     private SignalCallBack signalCallBack;
     private PhoneBroadcastReceive mPhoneBroadcastReceive;
     private boolean isInited = false;
-    private CameraVideoCapturer videoCapturer;
     private boolean isNormal = true;
     protected boolean isVideoCall = true;//视频通话或者语音通话
     protected boolean isAdd;//是否是加入聊天室。false表示自己是房主
@@ -201,16 +219,27 @@ public abstract class BaseCallActivity extends GridBaseActivity implements WebRt
         surfaceRemote = setSurfaceRemote();
         layoutLocalVideo = setLayoutLocalVideo();
         layoutRemoteVideo = setLayoutRemoteVideo();
-        remoteSinks.add(surfaceRemote);
+        remoteSinks.add(remoteProxyRenderer);
         rootEglBase = EglBase.create();
         if (isVideoCall) {
-            scalingType = RendererCommon.ScalingType.SCALE_ASPECT_FILL;
             if (surfaceLocal != null) {
                 surfaceLocal.init(rootEglBase.getEglBaseContext(), null);
+                surfaceLocal.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
                 surfaceLocal.setZOrderMediaOverlay(true);
+                surfaceLocal.setEnableHardwareScaler(true /* enabled */);
+                // Swap feeds on pip view click.
+                surfaceLocal.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        switchVideo(!isNormal);
+                    }
+                });
+
             }
             if (surfaceRemote != null) {
                 surfaceRemote.init(rootEglBase.getEglBaseContext(), null);
+                surfaceRemote.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL);
+                surfaceRemote.setEnableHardwareScaler(false /* enabled */);
             }
         } else {
             if (layoutLocalVideo != null) {
@@ -506,35 +535,30 @@ public abstract class BaseCallActivity extends GridBaseActivity implements WebRt
         if (!isVideoCall) {//语音通话直接返回
             return;
         }
+        switchVideo(iceConnected);
+        if (layoutRemoteVideo != null && layoutLocalVideo != null) {
+            layoutRemoteVideo.setPosition(SURFACE_REMOTE_X, SURFACE_REMOTE_Y, SURFACE_REMOTE_WIDTH, SURFACE_REMOTE_HEIGHT);
+            layoutLocalVideo.setPosition(
+                    SURFACE_LOCAL_X_CONNECTED, SURFACE_LOCAL_Y_CONNECTED, SURFACE_LOCAL_WIDTH_CONNECTED, SURFACE_LOCAL_HEIGHT_CONNECTED);
+        } else {
+            if (layoutLocalVideo != null) {
+                layoutLocalVideo.setPosition(SURFACE_REMOTE_X, SURFACE_REMOTE_Y, SURFACE_REMOTE_WIDTH, SURFACE_REMOTE_HEIGHT);
+            }
+        }
         if (layoutRemoteVideo != null && surfaceRemote != null) {//设置远程画面窗口
             if (iceConnected) {
                 layoutRemoteVideo.setVisibility(View.VISIBLE);
-                layoutRemoteVideo.setPosition(SURFACE_REMOTE_X, SURFACE_REMOTE_Y, SURFACE_REMOTE_WIDTH, SURFACE_REMOTE_HEIGHT);
-                surfaceRemote.setScalingType(scalingType);
-                surfaceRemote.setMirror(false);
-                surfaceRemote.requestLayout();
             } else {//连接之前先隐藏
-                layoutRemoteVideo.setVisibility(View.GONE);
+                if (!isInitiator) {//连接之前，被叫的话就隐藏
+                    layoutRemoteVideo.setVisibility(View.GONE);
+                }
             }
         }
         if (layoutLocalVideo != null && surfaceLocal != null) {
             if (iceConnected) {
                 layoutLocalVideo.setVisibility(View.VISIBLE);
-                if (layoutRemoteVideo != null && surfaceRemote != null) {//同时存在远程画面，缩小本地画面
-                    layoutLocalVideo.setVisibility(View.VISIBLE);
-                    layoutLocalVideo.setPosition(
-                            SURFACE_LOCAL_X_CONNECTED, SURFACE_LOCAL_Y_CONNECTED, SURFACE_LOCAL_WIDTH_CONNECTED, SURFACE_LOCAL_HEIGHT_CONNECTED);
-                    surfaceLocal.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
-                    surfaceLocal.setMirror(true);
-                    surfaceLocal.requestLayout();
-                }
             } else {//连接之前，主叫的话显示本地画面
-                layoutLocalVideo.setPosition(
-                        SURFACE_LOCAL_X_CONNECTING, SURFACE_LOCAL_Y_CONNECTING, SURFACE_LOCAL_WIDTH_CONNECTING, SURFACE_LOCAL_HEIGHT_CONNECTING);
-                surfaceLocal.setScalingType(scalingType);
-                surfaceLocal.setMirror(true);
-                surfaceLocal.requestLayout();
-                if (!isInitiator) {//连接之前，被叫的话就隐藏
+                if (layoutRemoteVideo != null || !isInitiator) {//有两个窗口的时候
                     layoutLocalVideo.setVisibility(View.GONE);
                 }
             }
@@ -587,17 +611,18 @@ public abstract class BaseCallActivity extends GridBaseActivity implements WebRt
      * 切换摄像头
      */
     protected void switchCamera() {
-        videoCapturer.switchCamera(new CameraVideoCapturer.CameraSwitchHandler() {
-            @Override
-            public void onCameraSwitchDone(final boolean b) {
+        if (mWebRtcClient != null) {
+            mWebRtcClient.switchCamera();
+            mWebRtcClient.setAudioEnabled(false);
+        }
+    }
 
-            }
-
-            @Override
-            public void onCameraSwitchError(String s) {
-
-            }
-        });
+    protected void swipAudioEnabled() {
+        if (mWebRtcClient != null) {
+            isAudioEnabled = !isAudioEnabled;
+            mWebRtcClient.setAudioEnabled(isAudioEnabled);
+            updateCallView();
+        }
     }
 
     /**
@@ -685,35 +710,20 @@ public abstract class BaseCallActivity extends GridBaseActivity implements WebRt
     /**
      * 切换视频画面
      */
-    protected void switchVideo() {
-        if (!isVideoCall || layoutRemoteVideo == null
-                || layoutLocalVideo == null
-                || surfaceRemote == null
-                || surfaceLocal == null) {
+    protected void switchVideo(boolean isNormal) {
+        if (!isVideoCall) {
             return;
         }
-        if (isNormal) {
-            isNormal = false;
-            layoutRemoteVideo.setPosition(
-                    SURFACE_LOCAL_X_CONNECTED, SURFACE_LOCAL_Y_CONNECTED, SURFACE_LOCAL_WIDTH_CONNECTED, SURFACE_LOCAL_HEIGHT_CONNECTED);
-            surfaceRemote.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
-            layoutLocalVideo.setPosition(SURFACE_REMOTE_X, SURFACE_REMOTE_Y, SURFACE_REMOTE_WIDTH, SURFACE_REMOTE_HEIGHT);
-            surfaceLocal.setScalingType(scalingType);
-            surfaceRemote.setZOrderMediaOverlay(true);
-            surfaceLocal.setZOrderMediaOverlay(false);
-            surfaceLocal.requestLayout();
-            surfaceRemote.requestLayout();
-        } else {
-            isNormal = true;
-            layoutRemoteVideo.setPosition(SURFACE_REMOTE_X, SURFACE_REMOTE_Y, SURFACE_REMOTE_WIDTH, SURFACE_REMOTE_HEIGHT);
-            surfaceRemote.setScalingType(scalingType);
-            layoutLocalVideo.setPosition(
-                    SURFACE_LOCAL_X_CONNECTED, SURFACE_LOCAL_Y_CONNECTED, SURFACE_LOCAL_WIDTH_CONNECTED, SURFACE_LOCAL_HEIGHT_CONNECTED);
-            surfaceLocal.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
-            surfaceRemote.setZOrderMediaOverlay(false);
-            surfaceLocal.setZOrderMediaOverlay(true);
-            surfaceLocal.requestLayout();
-            surfaceRemote.requestLayout();
+        this.isNormal = isNormal;
+        if (surfaceLocal != null && surfaceRemote != null) {//有两个窗口的时候
+            localProxyVideoSink.setTarget(isNormal ? surfaceLocal : surfaceRemote);
+            remoteProxyRenderer.setTarget(isNormal ? surfaceRemote : surfaceLocal);
+            surfaceRemote.setMirror(!isNormal);
+            surfaceLocal.setMirror(isNormal);
+        } else {//只有本地框口
+            if (surfaceLocal != null) {
+                localProxyVideoSink.setTarget(surfaceLocal);
+            }
         }
     }
 
@@ -731,6 +741,7 @@ public abstract class BaseCallActivity extends GridBaseActivity implements WebRt
                 layoutRemoteVideo.setVisibility(View.GONE);
             }
             sendSignal(Constant.SignalDestination.SIGNAL_Destination_CHANGE, "", Constant.SignalType.SIGNAL_CHANGE);
+            updateCallView();
         }
     }
 
@@ -915,7 +926,7 @@ public abstract class BaseCallActivity extends GridBaseActivity implements WebRt
                 videoCapturer = getVideoCapturer();
             }
             mWebRtcClient.createPeerConnection(
-                    surfaceLocal, remoteSinks, videoCapturer);
+                    localProxyVideoSink, remoteSinks, videoCapturer);
             if (BaseCallActivity.TYPE_INVITING == type) {
                 invite();
             }
@@ -1004,6 +1015,16 @@ public abstract class BaseCallActivity extends GridBaseActivity implements WebRt
     private void disConnect() {
         Log.e(TAG, "disConnect: ========================================");
         releaseMediaPlayer();
+        remoteProxyRenderer.setTarget(null);
+        localProxyVideoSink.setTarget(null);
+        if (surfaceLocal != null) {
+            surfaceLocal.release();
+            surfaceLocal = null;
+        }
+        if (surfaceRemote != null) {
+            surfaceRemote.release();
+            surfaceRemote = null;
+        }
         if (signalCallBack != null) {
             ChatClient.getInstance().getSignalManager().removeConnectionListener(signalCallBack);
             signalCallBack = null;
@@ -1016,12 +1037,6 @@ public abstract class BaseCallActivity extends GridBaseActivity implements WebRt
         if (mWebRtcClient != null) {
             mWebRtcClient.close();
             mWebRtcClient = null;
-        }
-        if (surfaceLocal != null) {
-            surfaceLocal.release();
-        }
-        if (surfaceRemote != null) {
-            surfaceRemote.release();
         }
         finish();
     }
@@ -1221,14 +1236,20 @@ public abstract class BaseCallActivity extends GridBaseActivity implements WebRt
             } else if (action.equals(Intent.ACTION_HEADSET_PLUG)) {
                 int state = intent.getIntExtra("state", 0);
                 if (state == 1) {
+                    lastMode = mRTCAudioManger.getCurrentMode();
                     //耳机已插入
                     if (mRTCAudioManger != null) {
                         mRTCAudioManger.changeToHeadsetMode();
                     }
+                    updateCallView();
                 } else if (state == 0) {
                     //耳机已拔出
                     if (mRTCAudioManger != null) {
-                        mRTCAudioManger.changeToEarpieceMode();
+                        if (lastMode == RTCAudioManger.MODE_SPEAKER) {
+                            mRTCAudioManger.changeToSpeakerMode();
+                        } else {
+                            mRTCAudioManger.changeToEarpieceMode();
+                        }
                     }
                     updateCallView();
                 } else {

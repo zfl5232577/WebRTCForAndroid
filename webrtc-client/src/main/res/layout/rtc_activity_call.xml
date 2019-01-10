@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:tool="http://schemas.android.com/tools"
+    android:background="@drawable/rtc_bg_activity_call">
+
+    <cn.aorise.webrtc.webrtc.PercentFrameLayout
+        android:id="@+id/layout_remote_video"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <org.webrtc.SurfaceViewRenderer
+            android:id="@+id/surface_remote"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </cn.aorise.webrtc.webrtc.PercentFrameLayout>
+
+    <cn.aorise.webrtc.webrtc.PercentFrameLayout
+        android:id="@+id/layout_local_video"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <org.webrtc.SurfaceViewRenderer
+            android:id="@+id/surface_local"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </cn.aorise.webrtc.webrtc.PercentFrameLayout>
+
+    <ImageView
+        android:id="@+id/iv_user_icon"
+        android:layout_width="@dimen/aorise_size_60dp"
+        android:layout_height="@dimen/aorise_size_60dp"
+        android:layout_marginLeft="@dimen/aorise_size_15dp"
+        android:layout_marginStart="@dimen/aorise_size_15dp"
+        android:layout_marginTop="@dimen/aorise_size_30dp"
+        android:src="@drawable/rtc_def_facetime_favicon"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/tv_user_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="@dimen/aorise_size_10dp"
+        android:layout_marginStart="@dimen/aorise_size_10dp"
+        android:layout_marginTop="@dimen/aorise_size_3dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        tool:text="管理员"
+        android:textColor="@color/white"
+        android:textSize="26sp"
+        app:layout_constraintStart_toEndOf="@id/iv_user_icon"
+        app:layout_constraintTop_toTopOf="@id/iv_user_icon" />
+
+    <TextView
+        android:id="@+id/tv_call_type"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/visual_text_invitation_you_video_call"
+        android:textColor="@color/white"
+        android:textSize="13sp"
+        app:layout_constraintStart_toStartOf="@id/tv_user_name"
+        app:layout_constraintTop_toBottomOf="@id/tv_user_name" />
+
+    <TextView
+        android:id="@+id/tv_refuse"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:layout_marginLeft="@dimen/aorise_size_30dp"
+        android:layout_marginStart="@dimen/aorise_size_30dp"
+        android:drawablePadding="@dimen/aorise_size_10dp"
+        android:drawableTop="@drawable/rtc_ic_refuse_hangup_call"
+        android:gravity="center"
+        android:text="@string/grid_call_refuse"
+        android:textColor="@color/white"
+        android:textSize="11sp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <TextView
+        android:id="@+id/tv_hang_up"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:drawablePadding="@dimen/aorise_size_10dp"
+        android:drawableTop="@drawable/rtc_ic_refuse_hangup_call"
+        android:gravity="center"
+        android:text="@string/grid_call_hang_up"
+        android:textColor="@color/white"
+        android:textSize="11sp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="parent"
+        app:layout_constraintStart_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/tv_answer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:layout_marginEnd="@dimen/aorise_size_30dp"
+        android:layout_marginRight="@dimen/aorise_size_30dp"
+        android:drawablePadding="@dimen/aorise_size_10dp"
+        android:drawableTop="@drawable/rtc_ic_answer_video"
+        android:gravity="center"
+        android:text="@string/grid_call_answer"
+        android:textColor="@color/white"
+        android:textSize="11sp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/tv_voice_answer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="35dp"
+        android:drawablePadding="@dimen/aorise_size_10dp"
+        android:drawableTop="@drawable/rtc_ic_video_voice_switch"
+        android:text="切到语音接听"
+        android:textColor="@color/white"
+        android:textSize="11sp"
+        app:layout_constraintBottom_toTopOf="@id/tv_answer"
+        app:layout_constraintEnd_toEndOf="@id/tv_answer"
+        app:layout_constraintStart_toStartOf="@id/tv_answer" />
+
+    <TextView
+        android:id="@+id/tv_call_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="155dp"
+        android:textColor="@color/white"
+        android:textSize="11sp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="@id/tv_hang_up"
+        app:layout_constraintStart_toStartOf="@id/tv_hang_up" />
+</android.support.constraint.ConstraintLayout>

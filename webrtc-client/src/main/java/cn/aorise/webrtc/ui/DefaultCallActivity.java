@@ -1,14 +1,16 @@
 package cn.aorise.webrtc.ui;
 
+import android.annotation.SuppressLint;
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.bumptech.glide.Glide;
 
 import org.webrtc.SurfaceViewRenderer;
 
+import cn.aorise.common.core.util.HandlerUtils;
 import cn.aorise.webrtc.R;
 import cn.aorise.webrtc.common.GlideCircleTransform;
 import cn.aorise.webrtc.webrtc.PercentFrameLayout;
@@ -25,47 +27,38 @@ import cn.aorise.webrtc.webrtc.RTCAudioManger;
  */
 public class DefaultCallActivity extends BaseCallActivity implements View.OnClickListener {
 
-    private TextView tvName;
-    private TextView tvAnswer;
+
+    private TextView tvUserName;
+    private ImageView ivUserIcon;
     private TextView tvRefuse;
-    private TextView tvCalling;
-    private TextView tvConnect;
-    private ImageView ivAvatar;
-    private ImageView ivAnswer;
-    private LinearLayout layoutUserInfo;
-    private LinearLayout layoutCallInvite;
-    private LinearLayout layoutCallRefuse;
-    private LinearLayout layoutCallAnswer;
+    private TextView tvAnswer;
+    private TextView tvVoiceAnswer;
+    private TextView tvCallType;
+    private TextView tvHangUp;
+    private TextView tvCallTime;
+    private long currentSecond;
+    private boolean frist = true;
 
     @Override
     protected void initView() {
-        setContentView(R.layout.grid_activity_call);
-        tvName = findViewById(R.id.tv_name);
-        ivAvatar = findViewById(R.id.iv_avatar);
-        ivAnswer = findViewById(R.id.iv_answer);
-        tvAnswer = findViewById(R.id.tv_answer);
+        setContentView(R.layout.rtc_activity_call);
+        tvUserName = findViewById(R.id.tv_user_name);
+        ivUserIcon = findViewById(R.id.iv_user_icon);
         tvRefuse = findViewById(R.id.tv_refuse);
-        tvCalling = findViewById(R.id.tv_calling);
-        tvConnect = findViewById(R.id.tv_connect);
-        layoutUserInfo = findViewById(R.id.layout_user_info);
-        layoutCallInvite = findViewById(R.id.layout_call_invite);
-        layoutCallRefuse = findViewById(R.id.layout_call_refuse);
-        layoutCallAnswer = findViewById(R.id.layout_call_answer);
-        tvName.setText(name);
-        Glide.with(this).load(imgUrl)
-                .bitmapTransform(new GlideCircleTransform(this))
-                .error(R.drawable.grid_def_facetime_favicon)
-                .placeholder(R.drawable.grid_def_facetime_favicon)
-                .crossFade(500)
-                .into(ivAvatar);
+        tvAnswer = findViewById(R.id.tv_answer);
+        tvVoiceAnswer = findViewById(R.id.tv_voice_answer);
+        tvCallType = findViewById(R.id.tv_call_type);
+        tvHangUp = findViewById(R.id.tv_hang_up);
+        tvCallTime = findViewById(R.id.tv_call_time);
         updateCallView();
     }
 
     @Override
     protected void initEvent() {
-        layoutCallInvite.setOnClickListener(this);
-        layoutCallRefuse.setOnClickListener(this);
-        layoutCallAnswer.setOnClickListener(this);
+        tvAnswer.setOnClickListener(this);
+        tvHangUp.setOnClickListener(this);
+        tvRefuse.setOnClickListener(this);
+        tvVoiceAnswer.setOnClickListener(this);
     }
 
     @Override
@@ -92,45 +85,97 @@ public class DefaultCallActivity extends BaseCallActivity implements View.OnClic
     protected void updateCallView() {
         switch (type) {
             case TYPE_INVITING:
-                layoutUserInfo.setVisibility(View.VISIBLE);
-                layoutCallInvite.setVisibility(View.VISIBLE);
-                layoutCallRefuse.setVisibility(View.GONE);
-                layoutCallAnswer.setVisibility(View.GONE);
-                tvCalling.setVisibility(View.GONE);
-                tvConnect.setText(R.string.grid_call_wait_answer);
+                if (!TextUtils.isEmpty(name)) {
+                    tvUserName.setText(name);
+                }
+                if (!TextUtils.isEmpty(imgUrl)) {
+                    Glide.with(this).load(imgUrl)
+                            .bitmapTransform(new GlideCircleTransform(this))
+                            .error(R.drawable.rtc_def_facetime_favicon)
+                            .placeholder(R.drawable.rtc_def_facetime_favicon)
+                            .crossFade(500)
+                            .into(ivUserIcon);
+                }
+                tvRefuse.setVisibility(View.GONE);
+                tvAnswer.setVisibility(View.GONE);
+                tvVoiceAnswer.setVisibility(View.GONE);
+                tvCallType.setText(R.string.grid_call_wait_answer);
                 break;
             case TYPE_CALLING:
-                layoutUserInfo.setVisibility(View.GONE);
-                layoutCallInvite.setVisibility(View.GONE);
-                layoutCallRefuse.setVisibility(View.VISIBLE);
-                layoutCallAnswer.setVisibility(View.VISIBLE);
-                layoutCallRefuse.setClickable(true);
-                layoutCallAnswer.setClickable(true);
-                tvCalling.setVisibility(View.VISIBLE);
-                tvCalling.setText("和" + name + "通话中");
-                tvAnswer.setText(R.string.grid_call_hands_free);
-                tvRefuse.setText(R.string.grid_call_hang_up);
-                if (mRTCAudioManger != null) {
+                tvVoiceAnswer.setVisibility(View.GONE);
+                tvCallType.setText(R.string.grid_text_calling);
+                tvHangUp.setVisibility(View.VISIBLE);
+                if (isVideoCall) {
+                    tvRefuse.setVisibility(View.VISIBLE);
+                    tvAnswer.setVisibility(View.VISIBLE);
+                    tvAnswer.setText(R.string.visual_text_switch_voice_call);
+                    tvRefuse.setText(R.string.rtc_text_switch_camera);
+                    tvAnswer.setCompoundDrawablesWithIntrinsicBounds(null,
+                            getResources().getDrawable(R.drawable.rtc_ic_swap_video_voice), null, null);
+                    tvRefuse.setCompoundDrawablesWithIntrinsicBounds(null,
+                            getResources().getDrawable(R.drawable.rtc_ic_swap_camera), null, null);
+                } else {
+                    if (isAudioEnabled) {
+                        tvRefuse.setCompoundDrawablesWithIntrinsicBounds(null,
+                                getResources().getDrawable(R.drawable.rtc_ic_mute), null, null);
+                    } else {
+                        tvRefuse.setCompoundDrawablesWithIntrinsicBounds(null,
+                                getResources().getDrawable(R.drawable.rtc_ic_muted), null, null);
+                    }
                     switch (mRTCAudioManger.getCurrentMode()) {
                         case RTCAudioManger.MODE_SPEAKER:
-                            ivAnswer.setImageResource(R.drawable.grid_ic_hands_free);
+                            tvAnswer.setAlpha(1f);
+                            tvAnswer.setCompoundDrawablesWithIntrinsicBounds(null,
+                                    getResources().getDrawable(R.drawable.rtc_ic_speak), null, null);
                             break;
+
                         case RTCAudioManger.MODE_EARPIECE:
-                            ivAnswer.setImageResource(R.drawable.grid_ic_speak);
+                            tvAnswer.setAlpha(1f);
+                            tvAnswer.setCompoundDrawablesWithIntrinsicBounds(null,
+                                    getResources().getDrawable(R.drawable.rtc_ic_hands_free), null, null);
+                            break;
+
+                        case RTCAudioManger.MODE_HEADSET:
+                            tvAnswer.setAlpha(0.5f);
                             break;
                     }
-                    break;
+                    tvAnswer.setText(R.string.grid_call_hands_free);
+                    tvRefuse.setText(R.string.grid_call_mute);
                 }
+                if (frist) {
+                    frist = false;
+                    //通话计时器
+                    HandlerUtils.runOnUiThreadDelay((new Runnable() {
+                        @Override
+                        public void run() {
+                            currentSecond += 1000;
+                            tvCallTime.setText(transformTime(currentSecond));
+                            HandlerUtils.runOnUiThreadDelay(this, 1000);
+                        }
+                    }), 1000);
+                }
+                break;
             case TYPE_CALLED:
-                layoutUserInfo.setVisibility(View.VISIBLE);
-                layoutCallInvite.setVisibility(View.GONE);
-                layoutCallRefuse.setVisibility(View.VISIBLE);
-                layoutCallAnswer.setVisibility(View.VISIBLE);
-                tvCalling.setVisibility(View.GONE);
-                ivAnswer.setImageResource(R.drawable.grid_ic_answer);
-                tvConnect.setText(R.string.grid_call_receive_video);
-                tvAnswer.setText(R.string.grid_call_answer);
-                tvRefuse.setText(R.string.grid_call_refuse);
+                if (!TextUtils.isEmpty(name)) {
+                    tvUserName.setText(name);
+                }
+                if (!TextUtils.isEmpty(imgUrl)) {
+                    Glide.with(this).load(imgUrl)
+                            .bitmapTransform(new GlideCircleTransform(this))
+                            .error(R.drawable.rtc_def_facetime_favicon)
+                            .placeholder(R.drawable.rtc_def_facetime_favicon)
+                            .crossFade(500)
+                            .into(ivUserIcon);
+                }
+                tvHangUp.setVisibility(View.GONE);
+                if (isVideoCall) {
+                    tvCallType.setText(R.string.visual_text_invitation_you_video_call);
+                } else {
+                    tvCallType.setText(R.string.visual_text_invitation_you_voice_call);
+                    tvVoiceAnswer.setVisibility(View.GONE);
+                    tvAnswer.setCompoundDrawablesWithIntrinsicBounds(null,
+                            getResources().getDrawable(R.drawable.rtc_ic_answer_call), null, null);
+                }
                 break;
         }
     }
@@ -138,22 +183,74 @@ public class DefaultCallActivity extends BaseCallActivity implements View.OnClic
     @Override
     public void onClick(View v) {
         int id = v.getId();
-        if (id == R.id.layout_call_answer) {
-            if (isCalling) {
-//                switchAudioMode();
-                convertToSpeech();
+        if (id == R.id.tv_answer) {
+            if (BaseCallActivity.TYPE_CALLING == type) {
+                if (isVideoCall) {
+                    convertToSpeech();
+                } else {
+                    switchAudioMode();
+                }
             } else {
-                //接受邀请
-                layoutCallAnswer.setClickable(false);
-                layoutCallRefuse.setClickable(false);
-                tvConnect.setText(R.string.grid_call_connecting);
+                tvCallTime.setText(cn.aorise.webrtc.R.string.grid_call_connecting);
                 answer();
             }
+        } else if (id == R.id.tv_hang_up) {
+            hangupOrRefuse();
+        } else if (id == R.id.tv_refuse) {
+            if (BaseCallActivity.TYPE_CALLING == type) {
+                if (isVideoCall) {
+                    switchCamera();
+                } else {
+                    swipAudioEnabled();
+                }
+            } else {
+                hangupOrRefuse();
+            }
+        } else if (id == R.id.tv_voice_answer) {
+            tvCallTime.setText(cn.aorise.webrtc.R.string.grid_call_connecting);
+            answer(false);
+        }
+    }
 
-        } else if (id == R.id.layout_call_invite) {
-            hangupOrRefuse();
-        } else if (id == R.id.layout_call_refuse) {
-            hangupOrRefuse();
+    /**
+     * 根据毫秒返回时分秒
+     *
+     * @param time
+     * @return
+     */
+    @SuppressLint("DefaultLocale")
+    private String transformTime(long time) {
+        time = time / 1000;//总秒数
+        if (time < 3600) {
+            int s = (int) (time % 60);//秒
+            int m = (int) (time / 60);//分
+            return String.format("%02d:%02d", m, s);
+        } else {
+            int h = (int) (time / 3600);//时
+            int m = (int) (time % 3600 / 60);//分
+            int s = (int) (time % 3600 % 60);//秒
+            return String.format("%02d:%02d:%02d", h, m, s);
+        }
+    }
+
+    @Override
+    public void finish() {
+        if (getString(R.string.grid_call_connecting).equals(tvCallTime.getText().toString()) || (signalMessageType != null && (signalMessageType.equals(cn.aorise.webrtc.api.Constant.SignalType.SIGNAL_REMOVED)
+                || signalMessageType.equals(cn.aorise.webrtc.api.Constant.SignalType.SIGNAL_REFUSED)
+                || signalMessageType.equals(cn.aorise.webrtc.api.Constant.SignalType.SIGNAL_ADD_MEMBER_REFUSED)
+                || signalMessageType.equals(cn.aorise.webrtc.api.Constant.SignalType.SIGNAL_ROOM_FULL)))) {
+            tvVoiceAnswer.setClickable(false);
+            tvRefuse.setClickable(false);
+            tvHangUp.setClickable(false);
+            tvAnswer.setClickable(false);
+            HandlerUtils.runOnUiThreadDelay(new Runnable() {
+                @Override
+                public void run() {
+                    DefaultCallActivity.super.finish();
+                }
+            }, 1500);
+        } else {
+            super.finish();
         }
     }
 }

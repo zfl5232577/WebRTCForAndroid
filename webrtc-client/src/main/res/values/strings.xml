@@ -35,8 +35,15 @@
     <string name="grid_call_answer">接听</string>
     <string name="grid_call_refuse">拒绝</string>
     <string name="grid_call_hands_free">免提</string>
+    <string name="grid_call_mute">静音</string>
     <string name="grid_call_hang_up">挂断</string>
     <string name="grid_call_connecting">连接中</string>
+    <string name="grid_text_calling">通话中</string>
+    <string name="visual_text_invitation_you_video_call">邀请你视频聊天</string>
+    <string name="visual_text_invitation_you_voice_call">邀请你语音聊天</string>
+    <string name="visual_text_switch_voice_call">切换为语音</string>
+    <string name="visual_text_switch_video_call">切换为视频</string>
+    <string name="rtc_text_switch_camera">转换摄像头</string>
 
     <!--dialog-->
     <string name="grid_dialog_permission_exit">退出</string>

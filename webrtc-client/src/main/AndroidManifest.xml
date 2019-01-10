@@ -28,6 +28,7 @@
     <application android:allowBackup="true">
         <activity
             android:name=".ui.DefaultCallActivity"
+            android:theme="@style/Theme.AppCompat.NoActionBar"
             android:exported="true"
             android:label="@string/grid_title_activity_call"
             android:launchMode="singleTask"
